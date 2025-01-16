@@ -1,0 +1,48 @@
+# We're not using readability-braces-around-statements as we using
+# the google-* version of that which is more sensible (allows one-liners
+# without braces).
+###
+Checks: >
+  clang-diagnostic-*,
+  -clang-diagnostic-unknown-pragmas,
+  clang-analyzer-*,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
+  abseil-*,
+  readability-*,
+  -readability-avoid-unconditional-preprocessor-if,
+  -readability-braces-around-statements,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-magic-numbers,
+  -readability-named-parameter,
+  -readability-static-definition-in-anonymous-namespace,
+  -readability-uppercase-literal-suffix,
+  -readability-use-anyofallof,
+  google-*,
+  -google-readability-casting,
+  -google-readability-todo,
+  -google-readability-avoid-underscore-in-googletest-name,
+  performance-*,
+  -performance-enum-size,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  modernize-*,
+  -modernize-avoid-c-arrays,
+  -modernize-make-unique,
+  -modernize-use-auto,
+  -modernize-use-nodiscard,
+  -modernize-use-std-print,
+  -modernize-use-trailing-return-type,
+  misc-*,
+  -misc-no-recursion,
+  -misc-unused-parameters,
+  -misc-use-anonymous-namespace,
+CheckOptions:
+  # Structs can not have non-public memebers, so they should be public.
+  # but clang-tidy warns about them anyway as being visible.
+  # clang-tidy can't distinguish between classes and structs, so approximate
+  # with this:
+  - key: misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: '1'

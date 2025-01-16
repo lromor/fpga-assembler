@@ -1,0 +1,1540 @@
+diff --git a/BUILD b/BUILD
+new file mode 100644
+index 00000000..bd54acd7
+--- /dev/null
++++ b/BUILD
+@@ -0,0 +1,137 @@
++load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
++
++cc_library(
++    name = "prjxray",
++    srcs = [
++        "lib/database.cc",
++        "lib/memory_mapped_file.cc",
++        "lib/segbits_file_reader.cc",
++        "lib/xilinx/bitstream_writer.cc",
++        "lib/xilinx/configuration_packet.cc",
++        "lib/xilinx/configuration_register.cc",
++        "lib/xilinx/configuration.cc",
++        "lib/xilinx/frames.cc",
++
++        # Spartan6 specific
++        "lib/xilinx/spartan6/frame_address.cc",
++        "lib/xilinx/spartan6/global_clock_region.cc",
++        "lib/xilinx/spartan6/part.cc",
++        "lib/xilinx/spartan6/configuration_row.cc",
++        "lib/xilinx/spartan6/block_type.cc",
++        "lib/xilinx/spartan6/configuration_bus.cc",
++        "lib/xilinx/spartan6/configuration_column.cc",
++
++        # Series-7 specific
++        "lib/xilinx/xc7series/frame_address.cc",
++        "lib/xilinx/xc7series/global_clock_region.cc",
++        "lib/xilinx/xc7series/part.cc",
++        "lib/xilinx/xc7series/configuration_row.cc",
++        "lib/xilinx/xc7series/block_type.cc",
++        "lib/xilinx/xc7series/configuration_bus.cc",
++        "lib/xilinx/xc7series/configuration_column.cc",
++        "lib/xilinx/xc7series/ecc.cc",
++    ],
++    hdrs = glob(["lib/include/**/*.h"]),
++    includes = ["lib/include"],
++    deps = [
++        "@abseil-cpp//absl/types:optional",
++        "@abseil-cpp//absl/types:variant",
++        "@abseil-cpp//absl/strings:strings",
++        "@abseil-cpp//absl/types:span",
++        "@abseil-cpp//absl/time:time",
++        "@yaml-cpp//:yaml-cpp",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "test_data",
++    srcs = glob(["lib/test_data/**"]),
++    visibility = ["//visibility:public"],
++)
++
++cc_test(
++    name = "big_endian_span_test",
++    srcs = ["lib/big_endian_span_test.cc"],
++    deps = [
++        ":prjxray",
++        "@googletest//:gtest_main",
++    ],
++)
++
++cc_test(
++    name = "bit_ops_test",
++    srcs = ["lib/bit_ops_test.cc"],
++    deps = [
++        ":prjxray",
++        "@googletest//:gtest_main",
++    ],
++)
++
++cc_test(
++    name = "memory_mapped_file_test",
++    srcs = ["lib/memory_mapped_file_test.cc"],
++    deps = [
++        ":prjxray",
++        "@googletest//:gtest_main",
++    ],
++    data = ["//:test_data"],
++)
++
++cc_test(
++    name = "segbits_file_reader_test",
++    srcs = ["lib/segbits_file_reader_test.cc"],
++    deps = [
++        ":prjxray",
++        "@googletest//:gtest_main",
++    ],
++    data = ["//:test_data"],
++)
++
++cc_test(
++    name = "xilinx_xc7series_test",
++    srcs = [
++        "lib/xilinx/tests/xc7series/bitstream_reader_test.cc",
++        "lib/xilinx/tests/xc7series/bitstream_writer_test.cc",
++        "lib/xilinx/tests/xc7series/block_type_test.cc",
++        "lib/xilinx/tests/xc7series/configuration_bus_test.cc",
++        "lib/xilinx/tests/xc7series/configuration_column_test.cc",
++        "lib/xilinx/tests/xc7series/configuration_packet_test.cc",
++        "lib/xilinx/tests/xc7series/configuration_test.cc",
++        "lib/xilinx/tests/xc7series/crc_test.cc",
++        "lib/xilinx/tests/xc7series/ecc_test.cc",
++        "lib/xilinx/tests/xc7series/frame_address_test.cc",
++        "lib/xilinx/tests/xc7series/frames_test.cc",
++        "lib/xilinx/tests/xc7series/global_clock_region_test.cc",
++        "lib/xilinx/tests/xc7series/part_test.cc",
++        "lib/xilinx/tests/xc7series/row_test.cc",
++    ],
++    deps = [
++        ":prjxray",
++        "@googletest//:gtest_main",
++    ],
++    data = ["//:test_data"],
++)
++
++cc_test(
++    name = "xilinx_spartan6_test",
++    srcs = [
++        "lib/xilinx/tests/spartan6/bitstream_reader_test.cc",
++        "lib/xilinx/tests/spartan6/bitstream_writer_test.cc",
++        "lib/xilinx/tests/spartan6/block_type_test.cc",
++        "lib/xilinx/tests/spartan6/configuration_bus_test.cc",
++        "lib/xilinx/tests/spartan6/configuration_column_test.cc",
++        "lib/xilinx/tests/spartan6/configuration_packet_test.cc",
++        "lib/xilinx/tests/spartan6/configuration_test.cc",
++        "lib/xilinx/tests/spartan6/frame_address_test.cc",
++        "lib/xilinx/tests/spartan6/frames_test.cc",
++        "lib/xilinx/tests/spartan6/global_clock_region_test.cc",
++        "lib/xilinx/tests/spartan6/part_test.cc",
++        "lib/xilinx/tests/spartan6/row_test.cc",
++    ],
++    deps = [
++        ":prjxray",
++        "@googletest//:gtest_main",
++    ],
++    data = ["//:test_data"],
++)
+diff --git a/MODULE.bazel b/MODULE.bazel
+new file mode 100644
+index 00000000..610fefb5
+--- /dev/null
++++ b/MODULE.bazel
+@@ -0,0 +1,9 @@
++module(
++    name = "prjxray",
++    version = "0.0-583-t1e53270",
++)
++
++bazel_dep(name = "rules_cc", version = "0.0.16")
++bazel_dep(name = "abseil-cpp", version = "20240722.0.bcr.2")
++bazel_dep(name = "yaml-cpp", version = "0.8.0")
++bazel_dep(name = "googletest", version = "1.15.2")
+diff --git a/lib/big_endian_span_test.cc b/lib/big_endian_span_test.cc
+index 70c97212..b85d53ad 100644
+--- a/lib/big_endian_span_test.cc
++++ b/lib/big_endian_span_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/big_endian_span.h>
++#include "prjxray/big_endian_span.h"
+ 
+ #include <cstdint>
+ #include <vector>
+diff --git a/lib/bit_ops_test.cc b/lib/bit_ops_test.cc
+index ede093bf..601f5ff7 100644
+--- a/lib/bit_ops_test.cc
++++ b/lib/bit_ops_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/bit_ops.h>
++#include "prjxray/bit_ops.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/database.cc b/lib/database.cc
+index e9d767bf..cb89c416 100644
+--- a/lib/database.cc
++++ b/lib/database.cc
+@@ -7,13 +7,13 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/database.h>
++#include "prjxray/database.h"
+ 
+ #include <glob.h>
+ 
+ #include <memory>
+ 
+-#include <absl/strings/str_cat.h>
++#include "absl/strings/str_cat.h"
+ 
+ namespace prjxray {
+ 
+diff --git a/lib/include/prjxray/big_endian_span.h b/lib/include/prjxray/big_endian_span.h
+index 0d72c4df..1308baf8 100644
+--- a/lib/include/prjxray/big_endian_span.h
++++ b/lib/include/prjxray/big_endian_span.h
+@@ -13,7 +13,7 @@
+ #include <cassert>
+ #include <iterator>
+ 
+-#include <absl/types/span.h>
++#include "absl/types/span.h"
+ 
+ namespace prjxray {
+ 
+diff --git a/lib/include/prjxray/database.h b/lib/include/prjxray/database.h
+index 2399d797..7ecbf799 100644
+--- a/lib/include/prjxray/database.h
++++ b/lib/include/prjxray/database.h
+@@ -14,7 +14,7 @@
+ #include <string>
+ #include <vector>
+ 
+-#include <prjxray/segbits_file_reader.h>
++#include "prjxray/segbits_file_reader.h"
+ 
+ namespace prjxray {
+ 
+diff --git a/lib/include/prjxray/memory_mapped_file.h b/lib/include/prjxray/memory_mapped_file.h
+index 6aeb8210..e1ff7170 100644
+--- a/lib/include/prjxray/memory_mapped_file.h
++++ b/lib/include/prjxray/memory_mapped_file.h
+@@ -13,7 +13,7 @@
+ #include <memory>
+ #include <string>
+ 
+-#include <absl/types/span.h>
++#include "absl/types/span.h"
+ 
+ namespace prjxray {
+ 
+diff --git a/lib/include/prjxray/segbits_file_reader.h b/lib/include/prjxray/segbits_file_reader.h
+index 4ac72b88..5f5ac630 100644
+--- a/lib/include/prjxray/segbits_file_reader.h
++++ b/lib/include/prjxray/segbits_file_reader.h
+@@ -13,8 +13,8 @@
+ #include <iterator>
+ #include <memory>
+ 
+-#include <absl/strings/string_view.h>
+-#include <prjxray/memory_mapped_file.h>
++#include "absl/strings/string_view.h"
++#include "prjxray/memory_mapped_file.h"
+ 
+ namespace prjxray {
+ 
+diff --git a/lib/include/prjxray/xilinx/architectures.h b/lib/include/prjxray/xilinx/architectures.h
+index 60087f3f..4b5e0726 100644
+--- a/lib/include/prjxray/xilinx/architectures.h
++++ b/lib/include/prjxray/xilinx/architectures.h
+@@ -10,15 +10,15 @@
+ #ifndef PRJXRAY_LIB_XILINX_ARCHITECTURES_H_
+ #define PRJXRAY_LIB_XILINX_ARCHITECTURES_H_
+ 
+-#include <absl/types/variant.h>
++#include "absl/types/variant.h"
+ #include <memory>
+ #include <vector>
+ 
+-#include <prjxray/xilinx/configuration_packet.h>
+-#include <prjxray/xilinx/spartan6/frame_address.h>
+-#include <prjxray/xilinx/spartan6/part.h>
+-#include <prjxray/xilinx/xc7series/frame_address.h>
+-#include <prjxray/xilinx/xc7series/part.h>
++#include "prjxray/xilinx/configuration_packet.h"
++#include "prjxray/xilinx/spartan6/frame_address.h"
++#include "prjxray/xilinx/spartan6/part.h"
++#include "prjxray/xilinx/xc7series/frame_address.h"
++#include "prjxray/xilinx/xc7series/part.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/bitstream_reader.h b/lib/include/prjxray/xilinx/bitstream_reader.h
+index b47cd21a..2cbee084 100644
+--- a/lib/include/prjxray/xilinx/bitstream_reader.h
++++ b/lib/include/prjxray/xilinx/bitstream_reader.h
+@@ -15,11 +15,11 @@
+ #include <memory>
+ #include <vector>
+ 
+-#include <absl/types/span.h>
++#include "absl/types/span.h"
+ 
+-#include <prjxray/big_endian_span.h>
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/configuration_packet.h>
++#include "prjxray/big_endian_span.h"
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/configuration_packet.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/bitstream_writer.h b/lib/include/prjxray/xilinx/bitstream_writer.h
+index 0f15b4fb..724bcefa 100644
+--- a/lib/include/prjxray/xilinx/bitstream_writer.h
++++ b/lib/include/prjxray/xilinx/bitstream_writer.h
+@@ -19,15 +19,16 @@
+ #include <fstream>
+ #include <memory>
+ #include <vector>
++#include <iostream>
+ 
+-#include <absl/strings/str_cat.h>
+-#include <absl/time/clock.h>
+-#include <absl/time/time.h>
+-#include <absl/types/optional.h>
+-#include <absl/types/span.h>
++#include "absl/strings/str_cat.h"
++#include "absl/time/clock.h"
++#include "absl/time/time.h"
++#include "absl/types/optional.h"
++#include "absl/types/span.h"
+ 
+-#include <prjxray/big_endian_span.h>
+-#include <prjxray/xilinx/configuration_packet.h>
++#include "prjxray/big_endian_span.h"
++#include "prjxray/xilinx/configuration_packet.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/configuration.h b/lib/include/prjxray/xilinx/configuration.h
+index 0a883547..7c8f8681 100644
+--- a/lib/include/prjxray/xilinx/configuration.h
++++ b/lib/include/prjxray/xilinx/configuration.h
+@@ -13,11 +13,11 @@
+ #include <map>
+ #include <type_traits>
+ 
+-#include <absl/types/span.h>
++#include "absl/types/span.h"
+ 
+-#include <prjxray/bit_ops.h>
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/frames.h>
++#include "prjxray/bit_ops.h"
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/frames.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/configuration_packet.h b/lib/include/prjxray/xilinx/configuration_packet.h
+index 4940ee0f..43454702 100644
+--- a/lib/include/prjxray/xilinx/configuration_packet.h
++++ b/lib/include/prjxray/xilinx/configuration_packet.h
+@@ -13,9 +13,9 @@
+ #include <cstdint>
+ #include <ostream>
+ 
+-#include <absl/types/optional.h>
+-#include <absl/types/span.h>
+-#include <prjxray/xilinx/configuration_register.h>
++#include "absl/types/optional.h"
++#include "absl/types/span.h"
++#include "prjxray/xilinx/configuration_register.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/configuration_packet_with_payload.h b/lib/include/prjxray/xilinx/configuration_packet_with_payload.h
+index f5bac5f0..fc8c1056 100644
+--- a/lib/include/prjxray/xilinx/configuration_packet_with_payload.h
++++ b/lib/include/prjxray/xilinx/configuration_packet_with_payload.h
+@@ -12,10 +12,10 @@
+ 
+ #include <memory>
+ 
+-#include <absl/types/span.h>
+-#include <prjxray/bit_ops.h>
+-#include <prjxray/xilinx/configuration_packet.h>
+-#include <prjxray/xilinx/configuration_register.h>
++#include "absl/types/span.h"
++#include "prjxray/bit_ops.h"
++#include "prjxray/xilinx/configuration_packet.h"
++#include "prjxray/xilinx/configuration_register.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/frames.h b/lib/include/prjxray/xilinx/frames.h
+index ceb0950f..6f5f584f 100644
+--- a/lib/include/prjxray/xilinx/frames.h
++++ b/lib/include/prjxray/xilinx/frames.h
+@@ -16,8 +16,8 @@
+ #include <string>
+ #include <vector>
+ 
+-#include <absl/strings/str_split.h>
+-#include <prjxray/xilinx/architectures.h>
++#include "absl/strings/str_split.h"
++#include "prjxray/xilinx/architectures.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/nop_packet.h b/lib/include/prjxray/xilinx/nop_packet.h
+index aec8ae1e..33fb30c5 100644
+--- a/lib/include/prjxray/xilinx/nop_packet.h
++++ b/lib/include/prjxray/xilinx/nop_packet.h
+@@ -10,8 +10,8 @@
+ #ifndef PRJXRAY_LIB_XILINX_NOP_PACKET_H
+ #define PRJXRAY_LIB_XILINX_NOP_PACKET_H
+ 
+-#include <prjxray/xilinx/configuration_packet.h>
+-#include <prjxray/xilinx/configuration_register.h>
++#include "prjxray/xilinx/configuration_packet.h"
++#include "prjxray/xilinx/configuration_register.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/spartan6/configuration_bus.h b/lib/include/prjxray/xilinx/spartan6/configuration_bus.h
+index c81597fd..1584a045 100644
+--- a/lib/include/prjxray/xilinx/spartan6/configuration_bus.h
++++ b/lib/include/prjxray/xilinx/spartan6/configuration_bus.h
+@@ -15,9 +15,9 @@
+ #include <map>
+ #include <memory>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/spartan6/configuration_column.h>
+-#include <prjxray/xilinx/spartan6/frame_address.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/spartan6/configuration_column.h"
++#include "prjxray/xilinx/spartan6/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/spartan6/configuration_column.h b/lib/include/prjxray/xilinx/spartan6/configuration_column.h
+index 859ba263..671ba38f 100644
+--- a/lib/include/prjxray/xilinx/spartan6/configuration_column.h
++++ b/lib/include/prjxray/xilinx/spartan6/configuration_column.h
+@@ -13,8 +13,8 @@
+ #include <algorithm>
+ #include <cassert>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/spartan6/frame_address.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/spartan6/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/spartan6/configuration_row.h b/lib/include/prjxray/xilinx/spartan6/configuration_row.h
+index 2b766b2d..232e1893 100644
+--- a/lib/include/prjxray/xilinx/spartan6/configuration_row.h
++++ b/lib/include/prjxray/xilinx/spartan6/configuration_row.h
+@@ -15,10 +15,10 @@
+ #include <map>
+ #include <memory>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/spartan6/block_type.h>
+-#include <prjxray/xilinx/spartan6/configuration_bus.h>
+-#include <prjxray/xilinx/spartan6/frame_address.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/spartan6/block_type.h"
++#include "prjxray/xilinx/spartan6/configuration_bus.h"
++#include "prjxray/xilinx/spartan6/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/spartan6/frame_address.h b/lib/include/prjxray/xilinx/spartan6/frame_address.h
+index a060995e..7d1791a0 100644
+--- a/lib/include/prjxray/xilinx/spartan6/frame_address.h
++++ b/lib/include/prjxray/xilinx/spartan6/frame_address.h
+@@ -13,7 +13,7 @@
+ #include <cstdint>
+ #include <ostream>
+ 
+-#include <prjxray/xilinx/spartan6/block_type.h>
++#include "prjxray/xilinx/spartan6/block_type.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ #ifdef _GNU_SOURCE
+diff --git a/lib/include/prjxray/xilinx/spartan6/global_clock_region.h b/lib/include/prjxray/xilinx/spartan6/global_clock_region.h
+index 87eadb96..12073e2e 100644
+--- a/lib/include/prjxray/xilinx/spartan6/global_clock_region.h
++++ b/lib/include/prjxray/xilinx/spartan6/global_clock_region.h
+@@ -15,9 +15,9 @@
+ #include <map>
+ #include <memory>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/spartan6/configuration_row.h>
+-#include <prjxray/xilinx/spartan6/frame_address.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/spartan6/configuration_row.h"
++#include "prjxray/xilinx/spartan6/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/spartan6/part.h b/lib/include/prjxray/xilinx/spartan6/part.h
+index 3f9029f5..111c1593 100644
+--- a/lib/include/prjxray/xilinx/spartan6/part.h
++++ b/lib/include/prjxray/xilinx/spartan6/part.h
+@@ -16,8 +16,8 @@
+ #include <string>
+ #include <vector>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/spartan6/global_clock_region.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/spartan6/global_clock_region.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/xc7series/configuration_bus.h b/lib/include/prjxray/xilinx/xc7series/configuration_bus.h
+index 0b9a77a1..72436452 100644
+--- a/lib/include/prjxray/xilinx/xc7series/configuration_bus.h
++++ b/lib/include/prjxray/xilinx/xc7series/configuration_bus.h
+@@ -15,9 +15,9 @@
+ #include <map>
+ #include <memory>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/xc7series/configuration_column.h>
+-#include <prjxray/xilinx/xc7series/frame_address.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/xc7series/configuration_column.h"
++#include "prjxray/xilinx/xc7series/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/xc7series/configuration_column.h b/lib/include/prjxray/xilinx/xc7series/configuration_column.h
+index 35efd365..4e09e8b4 100644
+--- a/lib/include/prjxray/xilinx/xc7series/configuration_column.h
++++ b/lib/include/prjxray/xilinx/xc7series/configuration_column.h
+@@ -13,8 +13,8 @@
+ #include <algorithm>
+ #include <cassert>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/xc7series/frame_address.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/xc7series/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/xc7series/configuration_options_0_value.h b/lib/include/prjxray/xilinx/xc7series/configuration_options_0_value.h
+index d7c2cb55..10df6155 100644
+--- a/lib/include/prjxray/xilinx/xc7series/configuration_options_0_value.h
++++ b/lib/include/prjxray/xilinx/xc7series/configuration_options_0_value.h
+@@ -10,9 +10,9 @@
+ #ifndef PRJXRAY_LIB_XILINX_XC7SERIES_CONFIGURATION_OPTIONS_0_VALUE_H
+ #define PRJXRAY_LIB_XILINX_XC7SERIES_CONFIGURATION_OPTIONS_0_VALUE_H
+ 
+-#include <prjxray/bit_ops.h>
+-#include <prjxray/xilinx/configuration_packet.h>
+-#include <prjxray/xilinx/configuration_register.h>
++#include "prjxray/bit_ops.h"
++#include "prjxray/xilinx/configuration_packet.h"
++#include "prjxray/xilinx/configuration_register.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/include/prjxray/xilinx/xc7series/configuration_row.h b/lib/include/prjxray/xilinx/xc7series/configuration_row.h
+index 70043990..ec0f6e1f 100644
+--- a/lib/include/prjxray/xilinx/xc7series/configuration_row.h
++++ b/lib/include/prjxray/xilinx/xc7series/configuration_row.h
+@@ -15,10 +15,10 @@
+ #include <map>
+ #include <memory>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/xc7series/block_type.h>
+-#include <prjxray/xilinx/xc7series/configuration_bus.h>
+-#include <prjxray/xilinx/xc7series/frame_address.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/xc7series/block_type.h"
++#include "prjxray/xilinx/xc7series/configuration_bus.h"
++#include "prjxray/xilinx/xc7series/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/xc7series/frame_address.h b/lib/include/prjxray/xilinx/xc7series/frame_address.h
+index 6247f534..0d0943e7 100644
+--- a/lib/include/prjxray/xilinx/xc7series/frame_address.h
++++ b/lib/include/prjxray/xilinx/xc7series/frame_address.h
+@@ -13,7 +13,7 @@
+ #include <cstdint>
+ #include <ostream>
+ 
+-#include <prjxray/xilinx/xc7series/block_type.h>
++#include "prjxray/xilinx/xc7series/block_type.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ #ifdef _GNU_SOURCE
+diff --git a/lib/include/prjxray/xilinx/xc7series/global_clock_region.h b/lib/include/prjxray/xilinx/xc7series/global_clock_region.h
+index 83e81fda..8668ad80 100644
+--- a/lib/include/prjxray/xilinx/xc7series/global_clock_region.h
++++ b/lib/include/prjxray/xilinx/xc7series/global_clock_region.h
+@@ -15,9 +15,9 @@
+ #include <map>
+ #include <memory>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/xc7series/configuration_row.h>
+-#include <prjxray/xilinx/xc7series/frame_address.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/xc7series/configuration_row.h"
++#include "prjxray/xilinx/xc7series/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/include/prjxray/xilinx/xc7series/part.h b/lib/include/prjxray/xilinx/xc7series/part.h
+index e063fb5e..7bbe065f 100644
+--- a/lib/include/prjxray/xilinx/xc7series/part.h
++++ b/lib/include/prjxray/xilinx/xc7series/part.h
+@@ -16,8 +16,8 @@
+ #include <string>
+ #include <vector>
+ 
+-#include <absl/types/optional.h>
+-#include <prjxray/xilinx/xc7series/global_clock_region.h>
++#include "absl/types/optional.h"
++#include "prjxray/xilinx/xc7series/global_clock_region.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ namespace prjxray {
+diff --git a/lib/memory_mapped_file.cc b/lib/memory_mapped_file.cc
+index 0600c9b2..86c580ab 100644
+--- a/lib/memory_mapped_file.cc
++++ b/lib/memory_mapped_file.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/memory_mapped_file.h>
++#include "prjxray/memory_mapped_file.h"
+ 
+ #include <fcntl.h>
+ #include <sys/mman.h>
+diff --git a/lib/memory_mapped_file_test.cc b/lib/memory_mapped_file_test.cc
+index ab925a6b..ff6736e2 100644
+--- a/lib/memory_mapped_file_test.cc
++++ b/lib/memory_mapped_file_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/memory_mapped_file.h>
++#include "prjxray/memory_mapped_file.h"
+ 
+ #include <gtest/gtest.h>
+ 
+@@ -16,14 +16,14 @@ TEST(MemoryMappedFileTest, NonExistantFile) {
+ }
+ 
+ TEST(MemoryMappedFileTest, ZeroLengthFileReturnObjectWithZeroLength) {
+-	auto file = prjxray::MemoryMappedFile::InitWithFile("empty_file");
++	auto file = prjxray::MemoryMappedFile::InitWithFile("lib/test_data/empty_file");
+ 	ASSERT_TRUE(file);
+ 	EXPECT_EQ(nullptr, file->data());
+ 	EXPECT_EQ(static_cast<size_t>(0), file->size());
+ }
+ 
+ TEST(MemoryMappedFileTest, ExistingFile) {
+-	auto file = prjxray::MemoryMappedFile::InitWithFile("small_file");
++	auto file = prjxray::MemoryMappedFile::InitWithFile("lib/test_data/small_file");
+ 	ASSERT_TRUE(file);
+ 	EXPECT_EQ(static_cast<size_t>(4), file->size());
+ 	EXPECT_EQ(0, memcmp("foo\n", file->data(), 4));
+diff --git a/lib/segbits_file_reader.cc b/lib/segbits_file_reader.cc
+index 1837ca66..1dc9a81d 100644
+--- a/lib/segbits_file_reader.cc
++++ b/lib/segbits_file_reader.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/segbits_file_reader.h>
++#include "prjxray/segbits_file_reader.h"
+ 
+ namespace prjxray {
+ 
+diff --git a/lib/segbits_file_reader_test.cc b/lib/segbits_file_reader_test.cc
+index cc2b6299..e964f46f 100644
+--- a/lib/segbits_file_reader_test.cc
++++ b/lib/segbits_file_reader_test.cc
+@@ -8,7 +8,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/segbits_file_reader.h>
++#include "prjxray/segbits_file_reader.h"
+ 
+ #include <map>
+ #include <string>
+@@ -17,12 +17,12 @@
+ 
+ TEST(SegbitsFileReaderTest, NonExistantFileReturnsNull) {
+ 	EXPECT_FALSE(
+-	    prjxray::SegbitsFileReader::InitWithFile("does_not_exist"));
++	    prjxray::SegbitsFileReader::InitWithFile("lib/test_data/does_not_exist"));
+ }
+ 
+ TEST(SegbitsFileReaderTest, ZeroLengthFileYieldsNoItems) {
+ 	auto segbits_reader =
+-	    prjxray::SegbitsFileReader::InitWithFile("empty_file");
++	    prjxray::SegbitsFileReader::InitWithFile("lib/test_data/empty_file");
+ 	ASSERT_TRUE(segbits_reader);
+ 
+ 	EXPECT_EQ(segbits_reader->begin(), segbits_reader->end());
+@@ -30,7 +30,7 @@ TEST(SegbitsFileReaderTest, ZeroLengthFileYieldsNoItems) {
+ 
+ TEST(SegbitsFileReaderTest, FileWithOneEntry) {
+ 	auto segbits_reader =
+-	    prjxray::SegbitsFileReader::InitWithFile("one_entry.segbits");
++	    prjxray::SegbitsFileReader::InitWithFile("lib/test_data/one_entry.segbits");
+ 	ASSERT_TRUE(segbits_reader);
+ 
+ 	auto begin_iter = segbits_reader->begin();
+@@ -42,7 +42,7 @@ TEST(SegbitsFileReaderTest, FileWithOneEntry) {
+ 
+ TEST(SegbitsFileReaderTest, FileWithOneEntryWithEmptyTag) {
+ 	auto segbits_reader = prjxray::SegbitsFileReader::InitWithFile(
+-	    "one_entry_empty_tag.segbits");
++	    "lib/test_data/one_entry_empty_tag.segbits");
+ 	ASSERT_TRUE(segbits_reader);
+ 
+ 	auto begin_iter = segbits_reader->begin();
+@@ -54,7 +54,7 @@ TEST(SegbitsFileReaderTest, FileWithOneEntryWithEmptyTag) {
+ 
+ TEST(SegbitsFileReaderTest, FileWithOneEntryMissingBit) {
+ 	auto segbits_reader = prjxray::SegbitsFileReader::InitWithFile(
+-	    "one_entry_missing_bit.segbits");
++	    "lib/test_data/one_entry_missing_bit.segbits");
+ 	ASSERT_TRUE(segbits_reader);
+ 
+ 	auto begin_iter = segbits_reader->begin();
+@@ -66,7 +66,7 @@ TEST(SegbitsFileReaderTest, FileWithOneEntryMissingBit) {
+ 
+ TEST(SegbitsFileReaderTest, FileWithOneEntryWithExtraWhitespace) {
+ 	auto segbits_reader = prjxray::SegbitsFileReader::InitWithFile(
+-	    "one_entry_extra_whitespace.segbits");
++	    "lib/test_data/one_entry_extra_whitespace.segbits");
+ 	ASSERT_TRUE(segbits_reader);
+ 
+ 	auto begin_iter = segbits_reader->begin();
+@@ -78,7 +78,7 @@ TEST(SegbitsFileReaderTest, FileWithOneEntryWithExtraWhitespace) {
+ 
+ TEST(SegbitsFileReaderTest, FileWithTwoEntries) {
+ 	auto segbits_reader =
+-	    prjxray::SegbitsFileReader::InitWithFile("two_entries.segbits");
++	    prjxray::SegbitsFileReader::InitWithFile("lib/test_data/two_entries.segbits");
+ 	ASSERT_TRUE(segbits_reader);
+ 
+ 	auto iter = segbits_reader->begin();
+diff --git a/lib/xilinx/bitstream_writer.cc b/lib/xilinx/bitstream_writer.cc
+index fe06664f..b5a7e28b 100644
+--- a/lib/xilinx/bitstream_writer.cc
++++ b/lib/xilinx/bitstream_writer.cc
+@@ -9,9 +9,9 @@
+  */
+ #include <iostream>
+ 
+-#include <prjxray/bit_ops.h>
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/bitstream_writer.h>
++#include "prjxray/bit_ops.h"
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/bitstream_writer.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/configuration.cc b/lib/xilinx/configuration.cc
+index 881d9cd2..a560c22f 100644
+--- a/lib/xilinx/configuration.cc
++++ b/lib/xilinx/configuration.cc
+@@ -10,19 +10,19 @@
+ #include <fstream>
+ #include <iostream>
+ 
+-#include <absl/strings/str_cat.h>
+-#include <absl/strings/str_split.h>
+-#include <absl/time/clock.h>
+-#include <absl/time/time.h>
+-
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/bitstream_writer.h>
+-#include <prjxray/xilinx/configuration.h>
+-#include <prjxray/xilinx/configuration_packet_with_payload.h>
+-#include <prjxray/xilinx/nop_packet.h>
+-#include <prjxray/xilinx/spartan6/command.h>
+-#include <prjxray/xilinx/xc7series/command.h>
+-#include <prjxray/xilinx/xc7series/configuration_options_0_value.h>
++#include "absl/strings/str_cat.h"
++#include "absl/strings/str_split.h"
++#include "absl/time/clock.h"
++#include "absl/time/time.h"
++
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/bitstream_writer.h"
++#include "prjxray/xilinx/configuration.h"
++#include "prjxray/xilinx/configuration_packet_with_payload.h"
++#include "prjxray/xilinx/nop_packet.h"
++#include "prjxray/xilinx/spartan6/command.h"
++#include "prjxray/xilinx/xc7series/command.h"
++#include "prjxray/xilinx/xc7series/configuration_options_0_value.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/configuration_packet.cc b/lib/xilinx/configuration_packet.cc
+index a0832bb6..a1b4aa9b 100644
+--- a/lib/xilinx/configuration_packet.cc
++++ b/lib/xilinx/configuration_packet.cc
+@@ -7,13 +7,13 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/configuration_packet.h>
++#include "prjxray/xilinx/configuration_packet.h"
+ 
+ #include <iomanip>
+ #include <iostream>
+ #include <ostream>
+ 
+-#include <prjxray/bit_ops.h>
++#include "prjxray/bit_ops.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/configuration_register.cc b/lib/xilinx/configuration_register.cc
+index f3f0f2ff..5768c403 100644
+--- a/lib/xilinx/configuration_register.cc
++++ b/lib/xilinx/configuration_register.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/configuration_register.h>
++#include "prjxray/xilinx/configuration_register.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/frames.cc b/lib/xilinx/frames.cc
+index 5f36f6f5..5bae1213 100644
+--- a/lib/xilinx/frames.cc
++++ b/lib/xilinx/frames.cc
+@@ -7,8 +7,8 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/frames.h>
+-#include <prjxray/xilinx/xc7series/ecc.h>
++#include "prjxray/xilinx/frames.h"
++#include "prjxray/xilinx/xc7series/ecc.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/spartan6/block_type.cc b/lib/xilinx/spartan6/block_type.cc
+index 5b2a9067..5de7604a 100644
+--- a/lib/xilinx/spartan6/block_type.cc
++++ b/lib/xilinx/spartan6/block_type.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/block_type.h>
++#include "prjxray/xilinx/spartan6/block_type.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/spartan6/configuration_bus.cc b/lib/xilinx/spartan6/configuration_bus.cc
+index 4d6d8f19..e1c78e76 100644
+--- a/lib/xilinx/spartan6/configuration_bus.cc
++++ b/lib/xilinx/spartan6/configuration_bus.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/configuration_bus.h>
++#include "prjxray/xilinx/spartan6/configuration_bus.h"
+ 
+ #include <iostream>
+ 
+diff --git a/lib/xilinx/spartan6/configuration_column.cc b/lib/xilinx/spartan6/configuration_column.cc
+index 3d9caa32..3ac95ce9 100644
+--- a/lib/xilinx/spartan6/configuration_column.cc
++++ b/lib/xilinx/spartan6/configuration_column.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/configuration_column.h>
++#include "prjxray/xilinx/spartan6/configuration_column.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/spartan6/configuration_row.cc b/lib/xilinx/spartan6/configuration_row.cc
+index c5763980..283535f5 100644
+--- a/lib/xilinx/spartan6/configuration_row.cc
++++ b/lib/xilinx/spartan6/configuration_row.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/configuration_row.h>
++#include "prjxray/xilinx/spartan6/configuration_row.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/spartan6/frame_address.cc b/lib/xilinx/spartan6/frame_address.cc
+index 601e3581..7abe94c6 100644
+--- a/lib/xilinx/spartan6/frame_address.cc
++++ b/lib/xilinx/spartan6/frame_address.cc
+@@ -9,8 +9,8 @@
+  */
+ #include <iomanip>
+ 
+-#include <prjxray/bit_ops.h>
+-#include <prjxray/xilinx/spartan6/frame_address.h>
++#include "prjxray/bit_ops.h"
++#include "prjxray/xilinx/spartan6/frame_address.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/spartan6/global_clock_region.cc b/lib/xilinx/spartan6/global_clock_region.cc
+index 8af9ed74..b97dfd35 100644
+--- a/lib/xilinx/spartan6/global_clock_region.cc
++++ b/lib/xilinx/spartan6/global_clock_region.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/global_clock_region.h>
++#include "prjxray/xilinx/spartan6/global_clock_region.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/spartan6/part.cc b/lib/xilinx/spartan6/part.cc
+index a8215e35..da3cb744 100644
+--- a/lib/xilinx/spartan6/part.cc
++++ b/lib/xilinx/spartan6/part.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/part.h>
++#include "prjxray/xilinx/spartan6/part.h"
+ 
+ #include <iomanip>
+ #include <iostream>
+diff --git a/lib/xilinx/tests/spartan6/bitstream_reader_test.cc b/lib/xilinx/tests/spartan6/bitstream_reader_test.cc
+index 248d77a1..e0040148 100644
+--- a/lib/xilinx/tests/spartan6/bitstream_reader_test.cc
++++ b/lib/xilinx/tests/spartan6/bitstream_reader_test.cc
+@@ -9,13 +9,13 @@
+  */
+ #include <array>
+ 
+-#include <absl/types/span.h>
++#include "absl/types/span.h"
+ #include <gtest/gtest.h>
+-#include <prjxray/xilinx/bitstream_reader.h>
+-#include <prjxray/xilinx/configuration_packet.h>
+-#include <prjxray/xilinx/configuration_register.h>
++#include "prjxray/xilinx/bitstream_reader.h"
++#include "prjxray/xilinx/configuration_packet.h"
++#include "prjxray/xilinx/configuration_register.h"
+ 
+-#include <prjxray/big_endian_span.h>
++#include "prjxray/big_endian_span.h"
+ 
+ using namespace prjxray::xilinx;
+ TEST(BitstreamReaderTest, InitWithEmptyBytesReturnsNull) {
+@@ -77,7 +77,7 @@ TEST(BitstreamReaderTest, ParsesType1Packet) {
+ TEST(BitstreamReaderTest, ParseType2PacketWithoutType1Fails) {
+ 	std::vector<uint8_t> bitstream{
+ 	    0xAA, 0x99, 0x55, 0x66,  // sync
+-	    0x40, 0x00, 0x40, 0x00,  // Type 2 NOP
++	    0x40, 0x00, 0x40, 0x00, 0x40, 0x00,  // Type 2 NOP
+ 	};
+ 	auto reader = BitstreamReader<Spartan6>::InitWithBytes(bitstream);
+ 	ASSERT_TRUE(reader);
+diff --git a/lib/xilinx/tests/spartan6/bitstream_writer_test.cc b/lib/xilinx/tests/spartan6/bitstream_writer_test.cc
+index bb869ab1..b93dc116 100644
+--- a/lib/xilinx/tests/spartan6/bitstream_writer_test.cc
++++ b/lib/xilinx/tests/spartan6/bitstream_writer_test.cc
+@@ -10,11 +10,11 @@
+ #include <array>
+ 
+ #include <gtest/gtest.h>
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/bitstream_reader.h>
+-#include <prjxray/xilinx/bitstream_writer.h>
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/bitstream_reader.h"
++#include "prjxray/xilinx/bitstream_writer.h"
+ 
+-#include <prjxray/bit_ops.h>
++#include "prjxray/bit_ops.h"
+ 
+ using namespace prjxray::xilinx;
+ 
+diff --git a/lib/xilinx/tests/spartan6/block_type_test.cc b/lib/xilinx/tests/spartan6/block_type_test.cc
+index f764d023..30e143e7 100644
+--- a/lib/xilinx/tests/spartan6/block_type_test.cc
++++ b/lib/xilinx/tests/spartan6/block_type_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/block_type.h>
++#include "prjxray/xilinx/spartan6/block_type.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/spartan6/configuration_bus_test.cc b/lib/xilinx/tests/spartan6/configuration_bus_test.cc
+index 04834a85..79034c74 100644
+--- a/lib/xilinx/tests/spartan6/configuration_bus_test.cc
++++ b/lib/xilinx/tests/spartan6/configuration_bus_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/configuration_bus.h>
++#include "prjxray/xilinx/spartan6/configuration_bus.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/spartan6/configuration_column_test.cc b/lib/xilinx/tests/spartan6/configuration_column_test.cc
+index 229322bf..11405a5c 100644
+--- a/lib/xilinx/tests/spartan6/configuration_column_test.cc
++++ b/lib/xilinx/tests/spartan6/configuration_column_test.cc
+@@ -7,11 +7,11 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/configuration_column.h>
++#include "prjxray/xilinx/spartan6/configuration_column.h"
+ 
+ #include <gtest/gtest.h>
+-#include <prjxray/xilinx/spartan6/block_type.h>
+-#include <prjxray/xilinx/spartan6/frame_address.h>
++#include "prjxray/xilinx/spartan6/block_type.h"
++#include "prjxray/xilinx/spartan6/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ using namespace prjxray::xilinx;
+diff --git a/lib/xilinx/tests/spartan6/configuration_packet_test.cc b/lib/xilinx/tests/spartan6/configuration_packet_test.cc
+index 5494bd8c..30e15fb4 100644
+--- a/lib/xilinx/tests/spartan6/configuration_packet_test.cc
++++ b/lib/xilinx/tests/spartan6/configuration_packet_test.cc
+@@ -9,11 +9,11 @@
+  */
+ #include <functional>
+ 
+-#include <absl/meta/type_traits.h>
++#include "absl/meta/type_traits.h"
+ #include <gtest/gtest.h>
+-#include <prjxray/bit_ops.h>
++#include "prjxray/bit_ops.h"
+ 
+-#include <prjxray/xilinx/architectures.h>
++#include "prjxray/xilinx/architectures.h"
+ 
+ using namespace prjxray::xilinx;
+ 
+diff --git a/lib/xilinx/tests/spartan6/configuration_test.cc b/lib/xilinx/tests/spartan6/configuration_test.cc
+index 52243819..b9cc6c70 100644
+--- a/lib/xilinx/tests/spartan6/configuration_test.cc
++++ b/lib/xilinx/tests/spartan6/configuration_test.cc
+@@ -11,12 +11,12 @@
+ #include <iostream>
+ #include <vector>
+ 
+-#include <absl/types/span.h>
++#include "absl/types/span.h"
+ #include <gtest/gtest.h>
+-#include <prjxray/memory_mapped_file.h>
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/configuration.h>
+-#include <prjxray/xilinx/spartan6/frame_address.h>
++#include "prjxray/memory_mapped_file.h"
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/configuration.h"
++#include "prjxray/xilinx/spartan6/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ using namespace prjxray::xilinx;
+diff --git a/lib/xilinx/tests/spartan6/frame_address_test.cc b/lib/xilinx/tests/spartan6/frame_address_test.cc
+index 697e81b1..a3921dc9 100644
+--- a/lib/xilinx/tests/spartan6/frame_address_test.cc
++++ b/lib/xilinx/tests/spartan6/frame_address_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/frame_address.h>
++#include "prjxray/xilinx/spartan6/frame_address.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/spartan6/frames_test.cc b/lib/xilinx/tests/spartan6/frames_test.cc
+index d7494472..37dc7eb7 100644
+--- a/lib/xilinx/tests/spartan6/frames_test.cc
++++ b/lib/xilinx/tests/spartan6/frames_test.cc
+@@ -11,8 +11,8 @@
+ 
+ #include <gtest/gtest.h>
+ 
+-#include <prjxray/xilinx/frames.h>
+-#include <prjxray/xilinx/spartan6/part.h>
++#include "prjxray/xilinx/frames.h"
++#include "prjxray/xilinx/spartan6/part.h"
+ 
+ using namespace prjxray::xilinx;
+ TEST(FramesTest, FillInMissingFrames) {
+diff --git a/lib/xilinx/tests/spartan6/global_clock_region_test.cc b/lib/xilinx/tests/spartan6/global_clock_region_test.cc
+index 7c79fe72..9ae9b645 100644
+--- a/lib/xilinx/tests/spartan6/global_clock_region_test.cc
++++ b/lib/xilinx/tests/spartan6/global_clock_region_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/global_clock_region.h>
++#include "prjxray/xilinx/spartan6/global_clock_region.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/spartan6/part_test.cc b/lib/xilinx/tests/spartan6/part_test.cc
+index 49ea8fb1..6ffa74a5 100644
+--- a/lib/xilinx/tests/spartan6/part_test.cc
++++ b/lib/xilinx/tests/spartan6/part_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/part.h>
++#include "prjxray/xilinx/spartan6/part.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/spartan6/row_test.cc b/lib/xilinx/tests/spartan6/row_test.cc
+index 92a870d8..413e6d86 100644
+--- a/lib/xilinx/tests/spartan6/row_test.cc
++++ b/lib/xilinx/tests/spartan6/row_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/spartan6/configuration_row.h>
++#include "prjxray/xilinx/spartan6/configuration_row.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/xc7series/bitstream_reader_test.cc b/lib/xilinx/tests/xc7series/bitstream_reader_test.cc
+index 409ebb34..ab4edf5f 100644
+--- a/lib/xilinx/tests/xc7series/bitstream_reader_test.cc
++++ b/lib/xilinx/tests/xc7series/bitstream_reader_test.cc
+@@ -10,10 +10,10 @@
+ #include <array>
+ 
+ #include <gtest/gtest.h>
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/bitstream_reader.h>
+-#include <prjxray/xilinx/configuration_packet.h>
+-#include <prjxray/xilinx/configuration_register.h>
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/bitstream_reader.h"
++#include "prjxray/xilinx/configuration_packet.h"
++#include "prjxray/xilinx/configuration_register.h"
+ 
+ using namespace prjxray::xilinx;
+ 
+diff --git a/lib/xilinx/tests/xc7series/bitstream_writer_test.cc b/lib/xilinx/tests/xc7series/bitstream_writer_test.cc
+index f17ad62f..2b12f402 100644
+--- a/lib/xilinx/tests/xc7series/bitstream_writer_test.cc
++++ b/lib/xilinx/tests/xc7series/bitstream_writer_test.cc
+@@ -10,12 +10,12 @@
+ #include <array>
+ 
+ #include <gtest/gtest.h>
+-#include <prjxray/xilinx/bitstream_reader.h>
+-#include <prjxray/xilinx/bitstream_writer.h>
+-#include <prjxray/xilinx/configuration_packet.h>
+-#include <prjxray/xilinx/configuration_register.h>
++#include "prjxray/xilinx/bitstream_reader.h"
++#include "prjxray/xilinx/bitstream_writer.h"
++#include "prjxray/xilinx/configuration_packet.h"
++#include "prjxray/xilinx/configuration_register.h"
+ 
+-#include <prjxray/bit_ops.h>
++#include "prjxray/bit_ops.h"
+ 
+ using namespace prjxray::xilinx;
+ 
+diff --git a/lib/xilinx/tests/xc7series/block_type_test.cc b/lib/xilinx/tests/xc7series/block_type_test.cc
+index 643e90b9..580773a9 100644
+--- a/lib/xilinx/tests/xc7series/block_type_test.cc
++++ b/lib/xilinx/tests/xc7series/block_type_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/block_type.h>
++#include "prjxray/xilinx/xc7series/block_type.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/xc7series/configuration_bus_test.cc b/lib/xilinx/tests/xc7series/configuration_bus_test.cc
+index c58848ba..6cd84930 100644
+--- a/lib/xilinx/tests/xc7series/configuration_bus_test.cc
++++ b/lib/xilinx/tests/xc7series/configuration_bus_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/configuration_bus.h>
++#include "prjxray/xilinx/xc7series/configuration_bus.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/xc7series/configuration_column_test.cc b/lib/xilinx/tests/xc7series/configuration_column_test.cc
+index b2d2ca30..ac8a9122 100644
+--- a/lib/xilinx/tests/xc7series/configuration_column_test.cc
++++ b/lib/xilinx/tests/xc7series/configuration_column_test.cc
+@@ -7,11 +7,11 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/configuration_column.h>
++#include "prjxray/xilinx/xc7series/configuration_column.h"
+ 
+ #include <gtest/gtest.h>
+-#include <prjxray/xilinx/xc7series/block_type.h>
+-#include <prjxray/xilinx/xc7series/frame_address.h>
++#include "prjxray/xilinx/xc7series/block_type.h"
++#include "prjxray/xilinx/xc7series/frame_address.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ using namespace prjxray::xilinx;
+diff --git a/lib/xilinx/tests/xc7series/configuration_packet_test.cc b/lib/xilinx/tests/xc7series/configuration_packet_test.cc
+index d2244504..75da1a11 100644
+--- a/lib/xilinx/tests/xc7series/configuration_packet_test.cc
++++ b/lib/xilinx/tests/xc7series/configuration_packet_test.cc
+@@ -9,11 +9,11 @@
+  */
+ #include <functional>
+ 
+-#include <absl/meta/type_traits.h>
++#include "absl/meta/type_traits.h"
+ #include <gtest/gtest.h>
+-#include <prjxray/bit_ops.h>
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/configuration_packet.h>
++#include "prjxray/bit_ops.h"
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/configuration_packet.h"
+ 
+ using namespace prjxray::xilinx;
+ 
+diff --git a/lib/xilinx/tests/xc7series/configuration_test.cc b/lib/xilinx/tests/xc7series/configuration_test.cc
+index 12917786..bcd25cf2 100644
+--- a/lib/xilinx/tests/xc7series/configuration_test.cc
++++ b/lib/xilinx/tests/xc7series/configuration_test.cc
+@@ -11,15 +11,15 @@
+ #include <iostream>
+ #include <vector>
+ 
+-#include <absl/types/span.h>
++#include "absl/types/span.h"
+ #include <gtest/gtest.h>
+-#include <prjxray/memory_mapped_file.h>
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/bitstream_reader.h>
+-#include <prjxray/xilinx/configuration.h>
+-#include <prjxray/xilinx/configuration_packet.h>
+-#include <prjxray/xilinx/configuration_register.h>
+-#include <prjxray/xilinx/frames.h>
++#include "prjxray/memory_mapped_file.h"
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/bitstream_reader.h"
++#include "prjxray/xilinx/configuration.h"
++#include "prjxray/xilinx/configuration_packet.h"
++#include "prjxray/xilinx/configuration_register.h"
++#include "prjxray/xilinx/frames.h"
+ #include <yaml-cpp/yaml.h>
+ 
+ using namespace prjxray::xilinx;
+@@ -131,11 +131,11 @@ TEST(ConfigurationTest, ConstructFromPacketsWithAutoincrement) {
+ 
+ TEST(ConfigurationTest,
+      DebugAndPerFrameCrcBitstreamsProduceEqualConfigurations) {
+-	auto part = xc7series::Part::FromFile("configuration_test.yaml");
++	auto part = xc7series::Part::FromFile("lib/test_data/configuration_test.yaml");
+ 	ASSERT_TRUE(part);
+ 
+ 	auto debug_bitstream = prjxray::MemoryMappedFile::InitWithFile(
+-	    "configuration_test.debug.bit");
++	    "lib/test_data/configuration_test.debug.bit");
+ 	ASSERT_TRUE(debug_bitstream);
+ 
+ 	auto debug_reader = BitstreamReader<Series7>::InitWithBytes(
+@@ -147,7 +147,7 @@ TEST(ConfigurationTest,
+ 	ASSERT_TRUE(debug_configuration);
+ 
+ 	auto perframecrc_bitstream = prjxray::MemoryMappedFile::InitWithFile(
+-	    "configuration_test.perframecrc.bit");
++	    "lib/test_data/configuration_test.perframecrc.bit");
+ 	ASSERT_TRUE(perframecrc_bitstream);
+ 
+ 	auto perframecrc_reader = BitstreamReader<Series7>::InitWithBytes(
+@@ -187,11 +187,11 @@ TEST(ConfigurationTest,
+ }
+ 
+ TEST(ConfigurationTest, DebugAndNormalBitstreamsProduceEqualConfigurations) {
+-	auto part = xc7series::Part::FromFile("configuration_test.yaml");
++	auto part = xc7series::Part::FromFile("lib/test_data/configuration_test.yaml");
+ 	ASSERT_TRUE(part);
+ 
+ 	auto debug_bitstream = prjxray::MemoryMappedFile::InitWithFile(
+-	    "configuration_test.debug.bit");
++	    "lib/test_data/configuration_test.debug.bit");
+ 	ASSERT_TRUE(debug_bitstream);
+ 
+ 	auto debug_reader = BitstreamReader<Series7>::InitWithBytes(
+@@ -203,7 +203,7 @@ TEST(ConfigurationTest, DebugAndNormalBitstreamsProduceEqualConfigurations) {
+ 	ASSERT_TRUE(debug_configuration);
+ 
+ 	auto normal_bitstream =
+-	    prjxray::MemoryMappedFile::InitWithFile("configuration_test.bit");
++	    prjxray::MemoryMappedFile::InitWithFile("lib/test_data/configuration_test.bit");
+ 	ASSERT_TRUE(normal_bitstream);
+ 
+ 	auto normal_reader = BitstreamReader<Series7>::InitWithBytes(
+diff --git a/lib/xilinx/tests/xc7series/crc_test.cc b/lib/xilinx/tests/xc7series/crc_test.cc
+index 5b9f97bf..77498323 100644
+--- a/lib/xilinx/tests/xc7series/crc_test.cc
++++ b/lib/xilinx/tests/xc7series/crc_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/crc.h>
++#include "prjxray/xilinx/xc7series/crc.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/xc7series/ecc_test.cc b/lib/xilinx/tests/xc7series/ecc_test.cc
+index f2ed099d..bd7a216f 100644
+--- a/lib/xilinx/tests/xc7series/ecc_test.cc
++++ b/lib/xilinx/tests/xc7series/ecc_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/ecc.h>
++#include "prjxray/xilinx/xc7series/ecc.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/xc7series/frame_address_test.cc b/lib/xilinx/tests/xc7series/frame_address_test.cc
+index 5680526f..0f5e02e3 100644
+--- a/lib/xilinx/tests/xc7series/frame_address_test.cc
++++ b/lib/xilinx/tests/xc7series/frame_address_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/frame_address.h>
++#include "prjxray/xilinx/xc7series/frame_address.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/xc7series/frames_test.cc b/lib/xilinx/tests/xc7series/frames_test.cc
+index 8b0f04ec..5f13cf4b 100644
+--- a/lib/xilinx/tests/xc7series/frames_test.cc
++++ b/lib/xilinx/tests/xc7series/frames_test.cc
+@@ -11,9 +11,9 @@
+ 
+ #include <gtest/gtest.h>
+ 
+-#include <prjxray/xilinx/architectures.h>
+-#include <prjxray/xilinx/frames.h>
+-#include <prjxray/xilinx/xc7series/part.h>
++#include "prjxray/xilinx/architectures.h"
++#include "prjxray/xilinx/frames.h"
++#include "prjxray/xilinx/xc7series/part.h"
+ 
+ using namespace prjxray::xilinx;
+ 
+diff --git a/lib/xilinx/tests/xc7series/global_clock_region_test.cc b/lib/xilinx/tests/xc7series/global_clock_region_test.cc
+index 1ce55a69..b4d5d23b 100644
+--- a/lib/xilinx/tests/xc7series/global_clock_region_test.cc
++++ b/lib/xilinx/tests/xc7series/global_clock_region_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/global_clock_region.h>
++#include "prjxray/xilinx/xc7series/global_clock_region.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/xc7series/part_test.cc b/lib/xilinx/tests/xc7series/part_test.cc
+index 7a7a4bfd..889f34c4 100644
+--- a/lib/xilinx/tests/xc7series/part_test.cc
++++ b/lib/xilinx/tests/xc7series/part_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/part.h>
++#include "prjxray/xilinx/xc7series/part.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/tests/xc7series/row_test.cc b/lib/xilinx/tests/xc7series/row_test.cc
+index ee88004f..91b78bcb 100644
+--- a/lib/xilinx/tests/xc7series/row_test.cc
++++ b/lib/xilinx/tests/xc7series/row_test.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/configuration_row.h>
++#include "prjxray/xilinx/xc7series/configuration_row.h"
+ 
+ #include <gtest/gtest.h>
+ 
+diff --git a/lib/xilinx/xc7series/block_type.cc b/lib/xilinx/xc7series/block_type.cc
+index 8a20aa19..38d9d9c9 100644
+--- a/lib/xilinx/xc7series/block_type.cc
++++ b/lib/xilinx/xc7series/block_type.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/block_type.h>
++#include "prjxray/xilinx/xc7series/block_type.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/xc7series/configuration_bus.cc b/lib/xilinx/xc7series/configuration_bus.cc
+index a479662b..a71123e7 100644
+--- a/lib/xilinx/xc7series/configuration_bus.cc
++++ b/lib/xilinx/xc7series/configuration_bus.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/configuration_bus.h>
++#include "prjxray/xilinx/xc7series/configuration_bus.h"
+ 
+ #include <iostream>
+ 
+diff --git a/lib/xilinx/xc7series/configuration_column.cc b/lib/xilinx/xc7series/configuration_column.cc
+index a77f2e73..075eab43 100644
+--- a/lib/xilinx/xc7series/configuration_column.cc
++++ b/lib/xilinx/xc7series/configuration_column.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/configuration_column.h>
++#include "prjxray/xilinx/xc7series/configuration_column.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/xc7series/configuration_row.cc b/lib/xilinx/xc7series/configuration_row.cc
+index 2a168911..6997eab1 100644
+--- a/lib/xilinx/xc7series/configuration_row.cc
++++ b/lib/xilinx/xc7series/configuration_row.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/configuration_row.h>
++#include "prjxray/xilinx/xc7series/configuration_row.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/xc7series/ecc.cc b/lib/xilinx/xc7series/ecc.cc
+index 1b24a46c..40a8a471 100644
+--- a/lib/xilinx/xc7series/ecc.cc
++++ b/lib/xilinx/xc7series/ecc.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/ecc.h>
++#include "prjxray/xilinx/xc7series/ecc.h"
+ #include <cassert>
+ #include <cstdio>
+ 
+diff --git a/lib/xilinx/xc7series/frame_address.cc b/lib/xilinx/xc7series/frame_address.cc
+index c76b2af8..1f320a38 100644
+--- a/lib/xilinx/xc7series/frame_address.cc
++++ b/lib/xilinx/xc7series/frame_address.cc
+@@ -7,11 +7,11 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/frame_address.h>
++#include "prjxray/xilinx/xc7series/frame_address.h"
+ 
+ #include <iomanip>
+ 
+-#include <prjxray/bit_ops.h>
++#include "prjxray/bit_ops.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/xc7series/global_clock_region.cc b/lib/xilinx/xc7series/global_clock_region.cc
+index 6a025f1e..b1cf2c08 100644
+--- a/lib/xilinx/xc7series/global_clock_region.cc
++++ b/lib/xilinx/xc7series/global_clock_region.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/global_clock_region.h>
++#include "prjxray/xilinx/xc7series/global_clock_region.h"
+ 
+ namespace prjxray {
+ namespace xilinx {
+diff --git a/lib/xilinx/xc7series/part.cc b/lib/xilinx/xc7series/part.cc
+index 549e3363..121575da 100644
+--- a/lib/xilinx/xc7series/part.cc
++++ b/lib/xilinx/xc7series/part.cc
+@@ -7,7 +7,7 @@
+  *
+  * SPDX-License-Identifier: ISC
+  */
+-#include <prjxray/xilinx/xc7series/part.h>
++#include "prjxray/xilinx/xc7series/part.h"
+ 
+ #include <iomanip>
+ #include <sstream>

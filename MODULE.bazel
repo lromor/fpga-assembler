@@ -1,0 +1,26 @@
+module(
+    name = "prjxstream",
+    version = "0.0.1",
+)
+
+# Bazel C/C++ language rules and deps.
+bazel_dep(name = "rules_cc", version = "0.0.16")
+# Until this is merged: https://github.com/bazelbuild/rules_cc/pull/306
+git_override(
+    module_name = "rules_cc",
+    commit = "4d6035a37b3211dec0fa5c070c7e9aac0e05186e",
+    remote = "https://github.com/lromor/rules_cc.git",
+)
+
+bazel_dep(name = "abseil-cpp", version = "20240116.2")
+bazel_dep(name = "googletest", version = "1.14.0")
+
+## C/C++ deps from local registry.
+bazel_dep(name = "prjxray", version = "0.0-583-t1e53270")
+git_override(
+    module_name = "prjxray",
+    commit = "3a95169e555de315c6b4cb71249107972d944303",
+    patch_strip = 1,
+    patches = ["//third_party:prjxray-add-module-bazel.patch"],
+    remote = "https://github.com/f4pga/prjxray.git",
+)
