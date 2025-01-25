@@ -2,7 +2,7 @@
 build --workspace_status_command="scripts/create-workspace-status.sh"
 
 # C++, with warnings mostly turned to 11.
-build       --cxxopt=-std=c++23            --host_cxxopt=-std=c++17
+build       --cxxopt=-std=c++17            --host_cxxopt=-std=c++17
 build       --cxxopt=-xc++                 --host_cxxopt=-xc++
 build       --cxxopt=-Wall                 --host_cxxopt=-Wall
 build       --cxxopt=-Wextra               --host_cxxopt=-Wextra
@@ -10,6 +10,7 @@ build       --cxxopt=-Wno-unused-parameter --host_cxxopt=-Wno-unused-parameter
 
 # Avoid costly language features.
 build       --cxxopt=-fno-rtti             --host_cxxopt=-fno-rtti
+build       --cxxopt=-fno-exceptions             --host_cxxopt=-fno-exceptions
 
 # For 3rd party code: Disable warnings entirely.
 # They are not actionable and just create noise.

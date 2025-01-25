@@ -14,6 +14,7 @@ git_override(
 
 bazel_dep(name = "abseil-cpp", version = "20240116.2")
 bazel_dep(name = "googletest", version = "1.14.0")
+bazel_dep(name = "rapidjson", version = "1.1.0.bcr.20241007")
 
 ## C/C++ deps from local registry.
 bazel_dep(name = "prjxray", version = "0.0-583-t1e53270")
@@ -21,6 +22,17 @@ git_override(
     module_name = "prjxray",
     commit = "3a95169e555de315c6b4cb71249107972d944303",
     patch_strip = 1,
-    patches = ["//third_party:prjxray-add-module-bazel.patch"],
+    patches = ["//bazel:prjxray-add-module-bazel.patch"],
     remote = "https://github.com/f4pga/prjxray.git",
+)
+
+# Repo to generate compilation database.
+bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
+git_override(
+    module_name = "hedron_compile_commands",
+    commit = "4f28899228fb3ad0126897876f147ca15026151e",
+    patch_strip = 1,
+    # https://github.com/hedronvision/bazel-compile-commands-extractor/issues/199
+    patches = ["//bazel:bazel-compile-commands-extractor-fix.patch"],
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
 )
