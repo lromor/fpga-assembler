@@ -10,6 +10,7 @@ pkgs.mkShell {
     bazel
     jdk
     bash
+    bant
 
     # For clang-tidy and clang-format.
     clangTools
