@@ -72,6 +72,18 @@ enum class PseudoPIPType {
 // Pseudo Programmable Interconnect Points.
 using PseudoPIPs = std::map<std::string, PseudoPIPType>;
 
-absl::StatusOr<PseudoPIPs> ParsePseudPIPsDatabase(absl::string_view content);
+// Parse tile-type specific Pseudo pips database.
+absl::StatusOr<PseudoPIPs> ParsePseudoPIPsDatabase(absl::string_view content);
+
+struct SegmentBit {
+  uint32_t word_column;
+  uint32_t word_bit;
+  bool is_set;
+};
+
+using SegmentsBits = std::map<std::string, std::vector<SegmentBit>>;
+
+// Parse tile-type segbits database.
+absl::StatusOr<SegmentsBits> ParseSegmentsBitsDatabase(absl::string_view content);
 }  // namespace prjxstream
 #endif  // PRJXSTREAM_DATABASE_H

@@ -1,6 +1,8 @@
 #include "prjxstream/database.h"
 
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
+
 #include "absl/strings/string_view.h"
 
 namespace prjxstream {
@@ -110,32 +112,78 @@ TEST(TileGridParser, EmptyTileGrid) {
 struct PseudoPIPsParserTestCase {
   absl::string_view db;
   PseudoPIPs expected_ppips;
-  bool success;
+  bool expected_success;
 };
 
-TEST(PseudoPIPsParser, SamplePseudoPip) {
+TEST(PseudoPIPsParser, CanParseSimpleDatabases) {
   const struct PseudoPIPsParserTestCase kTestCases[] = {
-    {.db= "Palways", .expected_ppips = {}, .success = false },
-    {.db= "P    always", .expected_ppips = {{"P", PseudoPIPType::kAlways}}, .success = true },
-    {.db= "P  always   \n", .expected_ppips = {{"P", PseudoPIPType::kAlways}}, .success = true },
-    {.db= "P always", .expected_ppips = {{"P", PseudoPIPType::kAlways}}, .success = true },
-    {.db= "P default", .expected_ppips = {{"P", PseudoPIPType::kDefault}}, .success = true },
-    {.db= "P hint", .expected_ppips = {{"P", PseudoPIPType::kHint}}, .success = true },
+    {.db= "Palways", .expected_ppips = {}, .expected_success = false },
+    {.db= "P    always", .expected_ppips = {{"P", PseudoPIPType::kAlways}}, .expected_success = true },
+    {.db= "P  always   \n", .expected_ppips = {{"P", PseudoPIPType::kAlways}}, .expected_success = true },
+    {.db= "P always", .expected_ppips = {{"P", PseudoPIPType::kAlways}}, .expected_success = true },
+    {.db= "P default", .expected_ppips = {{"P", PseudoPIPType::kDefault}}, .expected_success = true },
+    {.db= "P hint", .expected_ppips = {{"P", PseudoPIPType::kHint}}, .expected_success = true },
     {
       .db= "P  always   \n  A   default \n",
       .expected_ppips = {
         {"P", PseudoPIPType::kAlways},
         {"A", PseudoPIPType::kDefault}},
-      .success = true
+      .expected_success = true
     },
   };
   for (const auto &test : kTestCases) {
-    const absl::StatusOr<PseudoPIPs> res = ParsePseudPIPsDatabase(test.db);
-    if (!test.success) {
+    const absl::StatusOr<PseudoPIPs> res = ParsePseudoPIPsDatabase(test.db);
+    if (!test.expected_success) {
       EXPECT_FALSE(res.ok());
     } else {
       ASSERT_TRUE(res.ok()) << absl::StrFormat("for \"%s\"", test.db);
       EXPECT_EQ(res.value(), test.expected_ppips);
+    }
+  }
+}
+
+MATCHER(SegmentBitEquals, "segment bits are equal") {
+  const SegmentBit &actual = std::get<0>(arg);
+  const SegmentBit &expected = std::get<1>(arg);
+  EXPECT_THAT(actual, ::testing::AllOf(
+      ::testing::Field(&SegmentBit::word_column, expected.word_column),
+      ::testing::Field(&SegmentBit::word_bit, expected.word_bit),
+      ::testing::Field(&SegmentBit::is_set, expected.is_set)));
+  return true;
+}
+
+struct SegmentBitsParserTestCase {
+  absl::string_view db;
+  SegmentsBits expected_segbits;
+  bool expected_success;
+};
+
+TEST(SegmentsBitsParser, CanParseSimpleDatabases) {
+  const struct SegmentBitsParserTestCase kTestCases[] = {
+    //{"FOO 28_519 !29_519", {{"FOO", {{28, 519, true}, {29, 519, false}}}}, true},
+    //{"BAR !1_23", {{"BAR", {{1, 23, false}}}}, true},
+    {
+      "\n BAZ  42_42 33_93\n QUX !0_1 \n  ",
+      {
+        {"BAZ", {{42, 42, true}, {33, 93, true}}},
+        {"QUX", {{0, 1, false}}}
+      },
+      true
+    },
+  };
+  for (const auto &test : kTestCases) {
+    const absl::StatusOr<SegmentsBits> res = ParseSegmentsBitsDatabase(test.db);
+    if (!test.expected_success) {
+      EXPECT_FALSE(res.ok());
+    } else {
+      ASSERT_TRUE(res.ok()) << absl::StrFormat("for:\n\"%s\"\n%s", test.db, res.status().message());
+      const SegmentsBits &actual = res.value();
+      for (const auto& pair: test.expected_segbits) {
+        ASSERT_EQ(actual.count(pair.first), 1) << absl::StrFormat("expected key \"%s\" not found", pair.first);
+        EXPECT_THAT(
+            actual.at(pair.first),
+            ::testing::Pointwise(SegmentBitEquals(), pair.second));
+      }
     }
   }
 }

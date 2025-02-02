@@ -3,6 +3,7 @@
 #include <cstdlib>
 
 #include "absl/strings/str_split.h"
+#include "absl/strings/numbers.h"
 
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "rapidjson/document.h"
@@ -306,7 +307,7 @@ absl::Status ParsePseudoPIPDatabaseLine(uint32_t line_count, const absl::string_
         absl::StrFormat("invalid line \"%s\"", line));
   }
   const std::string &name = segments[0];
-  PseudoPIPType type;
+  PseudoPIPType type = {};
   absl::Status status = ParsePseudoPIPTypeFromString(segments[1], &type);
   if (!status.ok()) return status;
   out.insert({name, type});
@@ -314,7 +315,7 @@ absl::Status ParsePseudoPIPDatabaseLine(uint32_t line_count, const absl::string_
 }
 }  // namespace
 
-absl::StatusOr<PseudoPIPs> ParsePseudPIPsDatabase(const absl::string_view content) {
+absl::StatusOr<PseudoPIPs> ParsePseudoPIPsDatabase(const absl::string_view content) {
   PseudoPIPs pips;
   if (content.empty()) {
     return pips;
@@ -325,5 +326,58 @@ absl::StatusOr<PseudoPIPs> ParsePseudPIPsDatabase(const absl::string_view conten
   });
   if (!status.ok()) return status;
   return pips;
+}
+
+namespace {
+absl::Status ParseSegmentsBitsDatabaseLine(
+    uint32_t line_count, const absl::string_view line, SegmentsBits &out) {
+  std::vector<std::string> segments = absl::StrSplit(line, ' ', absl::SkipEmpty());
+  if (segments.empty()) return absl::OkStatus();
+  if (segments.size() == 1) {
+    return MakeInvalidLineStatus(line_count,
+        absl::StrFormat("invalid line \"%s\"", line));
+  }
+  const std::string &name = segments[0];
+  std::vector<SegmentBit> segment_bits;
+  for (size_t i = 1; i < segments.size(); ++i) {
+    const absl::string_view bit = segments[i];
+    const bool set = bit[0] != '!';
+    const std::vector<std::string> coordinates =
+        absl::StrSplit(set ? bit : bit.substr(1), '_');
+    if (coordinates.size() != 2) {
+      return MakeInvalidLineStatus(
+          line_count,
+          absl::StrFormat("invalid line \"%s\"", line));
+    }
+    uint32_t word_column;
+    uint32_t word_bit;
+    if (!absl::SimpleAtoi(coordinates[0], &word_column)) {
+      return MakeInvalidLineStatus(
+          line_count,
+          absl::StrFormat("could not parse coordinate \"%s\"", line));
+    }
+    if (!absl::SimpleAtoi(coordinates[1], &word_bit)) {
+      return MakeInvalidLineStatus(
+          line_count,
+          absl::StrFormat("could not parse coordinate \"%s\"", line));
+    }
+    segment_bits.push_back({word_column, word_bit, set});
+  }
+  out.insert({name, segment_bits});
+  return absl::OkStatus();
+}
+}  // namespace
+
+absl::StatusOr<SegmentsBits> ParseSegmentsBitsDatabase(absl::string_view content) {
+  SegmentsBits segbits;
+  if (content.empty()) {
+    return segbits;
+  }
+  absl::Status status = LinesGenerator(content, [&segbits](
+      uint32_t line_count, const absl::string_view line) -> absl::Status {
+    return ParseSegmentsBitsDatabaseLine(line_count, line, segbits);
+  });
+  if (!status.ok()) return status;
+  return segbits;
 }
 }  // namespace prjxstream
