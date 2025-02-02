@@ -21,6 +21,7 @@ class MemoryBlock {
   MemoryBlock &operator=(MemoryBlock &&) = delete;
 };
 
-absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(absl::string_view path);
+absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
+  absl::string_view path);
 }  // namespace prjxstream
 #endif  // PRJXSTREAM_MEM_BLOCK_H

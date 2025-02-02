@@ -1,19 +1,16 @@
 #ifndef PRJXSTREAM_DATABASE_H
 #define PRJXSTREAM_DATABASE_H
 
-#include <string>
-#include <vector>
 #include <cstdint>
 #include <map>
+#include <string>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace prjxstream {
-enum class FrameBlockType {
-  kCLBIOCLK,
-  kBlockRam
-};
+enum class FrameBlockType { kCLBIOCLK, kBlockRam };
 
 struct Location {
   uint32_t x;
@@ -70,10 +67,11 @@ enum class PseudoPIPType {
 };
 
 // Pseudo Programmable Interconnect Points.
-using PseudoPIPs = std::map<std::string, PseudoPIPType>;
+using TileTypePseudoPIPs = std::map<std::string, PseudoPIPType>;
 
 // Parse tile-type specific Pseudo pips database.
-absl::StatusOr<PseudoPIPs> ParsePseudoPIPsDatabase(absl::string_view content);
+absl::StatusOr<TileTypePseudoPIPs> ParsePseudoPIPsDatabase(
+  absl::string_view content);
 
 struct SegmentBit {
   uint32_t word_column;
@@ -81,9 +79,10 @@ struct SegmentBit {
   bool is_set;
 };
 
-using SegmentsBits = std::map<std::string, std::vector<SegmentBit>>;
+using TileTypeSegmentsBits = std::map<std::string, std::vector<SegmentBit>>;
 
 // Parse tile-type segbits database.
-absl::StatusOr<SegmentsBits> ParseSegmentsBitsDatabase(absl::string_view content);
+absl::StatusOr<TileTypeSegmentsBits> ParseSegmentsBitsDatabase(
+  absl::string_view content);
 }  // namespace prjxstream
 #endif  // PRJXSTREAM_DATABASE_H

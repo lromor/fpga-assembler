@@ -17,11 +17,10 @@
 #ifndef PRJXSTREAM_FASM_PARSER_H
 #define PRJXSTREAM_FASM_PARSER_H
 
-#include <cstdio>
-
 #include <algorithm>
 #include <cinttypes>
 #include <cstdint>
+#include <cstdio>
 #include <functional>
 #include <string_view>
 
@@ -32,23 +31,23 @@ namespace fasm {
 // Returns 'true' if it wants to continue get callbacks or 'false' if it
 // wants the parsing to abort.
 using ParseCallback =
-    std::function<bool(uint32_t line, std::string_view feature, int start_bit,
-                       int width, uint64_t bits)>;
+  std::function<bool(uint32_t line, std::string_view feature, int start_bit,
+                     int width, uint64_t bits)>;
 
 // Optional callback that receives annotation name/value pairs. If there are
 // multiple annotations per feature, this is called multiple times.
 using AnnotationCallback =
-    std::function<void(uint32_t line, std::string_view feature, //
-                       std::string_view name, std::string_view value)>;
+  std::function<void(uint32_t line, std::string_view feature,  //
+                     std::string_view name, std::string_view value)>;
 
 // Result values in increasing amount of severity. Start to worry at kSkipped.
 enum class ParseResult {
-  kSuccess,     // Successful parse
-  kInfo,        // Got info messages, mostly FYI
-  kNonCritical, // Found strange values, but mostly non-critical FYI
-  kSkipped,     // There were lines that had to be skipped.
-  kUserAbort,   // The callback returned 'false' to abort.
-  kError        // Errornous input
+  kSuccess,      // Successful parse
+  kInfo,         // Got info messages, mostly FYI
+  kNonCritical,  // Found strange values, but mostly non-critical FYI
+  kSkipped,      // There were lines that had to be skipped.
+  kUserAbort,    // The callback returned 'false' to abort.
+  kError         // Errornous input
 };
 
 // Parse FPGA assembly file, send parsed values to "parse_callback".
@@ -89,42 +88,42 @@ namespace internal {
 // Since we need a number smaller than the smallest digit, need signed values.
 inline constexpr int8_t kDigitSeparator = -1;  // _less_ than any digit.
 inline constexpr int8_t kDigitToInt[256] = {
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    00,  1,  2,  3,  4,  5,  6,  7,  8,  9, 99, 99, 99, 99, 99, 99,
-    99, 10, 11, 12, 13, 14, 15, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, kDigitSeparator,
-    99, 10, 11, 12, 13, 14, 15, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  00, 1,  2,  3,  4,  5,  6,  7,  8,  9,  99, 99, 99, 99, 99, 99,
+  99, 10, 11, 12, 13, 14, 15, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, kDigitSeparator,
+  99, 10, 11, 12, 13, 14, 15, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+  99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
 };
 
 // ASCII -> is valid identifier for the feature name.
 inline constexpr char kValidIdentifier[256] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, // dot
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, // digits
-    0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // LETTERS
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, // LETTERS, ... underscore
-    0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // letters
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,  // dot
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,  // digits
+  0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  // LETTERS
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1,  // LETTERS, ... underscore
+  0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  // letters
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
 };
 
 using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
@@ -134,20 +133,24 @@ using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
 #define fasm_unlikely(x) __builtin_expect((x), 0)
 
 // Skip until we hit the first non-blank char (EOL '\n' not considered blank)
-#define fasm_skip_blank() while (*it == ' ' || *it == '\t') ++it
+#define fasm_skip_blank() \
+  while (*it == ' ' || *it == '\t') ++it
 
 // Skip forward until we sit on the '\n' end of current line.
-#define fasm_skip_to_eol() while (*it != '\n') ++it
+#define fasm_skip_to_eol() \
+  while (*it != '\n') ++it
 
 // Skip forward beyond the end of current line. To be used before 'continue'.
-#define fasm_skip_to_start_of_next_line() fasm_skip_to_eol(); ++it
+#define fasm_skip_to_start_of_next_line() \
+  fasm_skip_to_eol();                     \
+  ++it
 
 // Parse number with given base (any base between 2 and 16 is supported)
-#define fasm_parse_number_with_base(v, base)                                   \
-  fasm_skip_blank();                                                           \
-  for (int8_t d; (d = internal::kDigitToInt[(uint8_t)*it]) < (base); ++it)     \
-    if (d == internal::kDigitSeparator) {                                      \
-    } else                                                                     \
+#define fasm_parse_number_with_base(v, base)                                 \
+  fasm_skip_blank();                                                         \
+  for (int8_t d; (d = internal::kDigitToInt[(uint8_t) * it]) < (base); ++it) \
+    if (d == internal::kDigitSeparator) {                                    \
+    } else                                                                   \
       v = v * (base) + d
 
 inline ParseResult Parse(std::string_view content, FILE *errstream,
@@ -224,7 +227,7 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
                 line_number, (int)feature.size(), feature.data(), max_bit,
                 min_bit, width);
         result = ParseResult::kError;
-        width = 64; // Clamp number of bits we report.
+        width = 64;  // Clamp number of bits we report.
         // Move foward, doing best effort parsing of lower 64 bits.
       }
 
@@ -236,7 +239,7 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
         fasm_skip_blank();
         bitset = 0;
         if (internal::kDigitToInt[(uint8_t)*it] <= 9) {
-          fasm_parse_number_with_base(bitset, 10); // width or decimal value
+          fasm_parse_number_with_base(bitset, 10);  // width or decimal value
         }
         fasm_skip_blank();
         if (*it == '\'') {
@@ -246,7 +249,8 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
           // ignore.
           if (fasm_unlikely(bitset > width)) {
             fprintf(errstream,
-                    "%u: WARN Attempt to assign more bits (%" PRIu64 "') for "
+                    "%u: WARN Attempt to assign more bits (%" PRIu64
+                    "') for "
                     "%.*s[%d:%d] with supported bit width of %u\n",
                     line_number, bitset, (int)feature.size(), feature.data(),
                     max_bit, min_bit, width);
@@ -257,21 +261,24 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
           ++it;
           switch (format_type) {
           case 'h': fasm_parse_number_with_base(bitset, 16); break;
-          case 'b': fasm_parse_number_with_base(bitset, 2);  break;
-          case 'o': fasm_parse_number_with_base(bitset, 8);  break;
+          case 'b': fasm_parse_number_with_base(bitset, 2); break;
+          case 'o': fasm_parse_number_with_base(bitset, 8); break;
           case 'd': fasm_parse_number_with_base(bitset, 10); break;
           default:
-            fprintf(errstream, "%u: unknown base signifier '%c'; expected "
-                    "one of b, d, h, o\n", line_number, format_type);
+            fprintf(errstream,
+                    "%u: unknown base signifier '%c'; expected "
+                    "one of b, d, h, o\n",
+                    line_number, format_type);
             result = ParseResult::kError;
             fasm_skip_to_eol();
-            bitset = 0x01; // In error state now, but report this feature as set
+            bitset =
+              0x01;  // In error state now, but report this feature as set
             break;
           }
           fasm_skip_blank();
         }
       } else {
-        bitset = 0x1; // No assignment: default assumption 1 bit set.
+        bitset = 0x1;  // No assignment: default assumption 1 bit set.
         if (fasm_unlikely(min_bit != max_bit)) {
           fprintf(errstream,
                   "%u: INFO Range of bits %.*s[%d:%d], but no assignment\n",
@@ -282,19 +289,19 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
       }
 
       // Ready to report the feature and their bits.
-      bitset &= uint64_t(-1) >> (64 - width); // Clamp bits if value too wide
+      bitset &= uint64_t(-1) >> (64 - width);  // Clamp bits if value too wide
       if (fasm_unlikely(
-              !parse_callback(line_number, feature, min_bit, width, bitset))) {
+            !parse_callback(line_number, feature, min_bit, width, bitset))) {
         result = std::max(result, ParseResult::kUserAbort);
         break;
       }
-    } // non-empty feature
+    }  // non-empty feature
 
     // Annotations might follow
     if (fasm_unlikely(*it == '{')) {
       if (annotation_callback) {
         do {
-          ++it; // skip '{' or ','
+          ++it;  // skip '{' or ','
           fasm_skip_blank();
           const char *const start_name = it;
           while (internal::kValidIdentifier[(uint8_t)*it]) {
@@ -327,7 +334,7 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
             while (*it != '"' && *it != '\n') {
               ++it;
             }
-          } while (*(it - 1) == '\\' && *it != '\n'); // quote was escaped
+          } while (*(it - 1) == '\\' && *it != '\n');  // quote was escaped
           const std::string_view avalue{start_value, size_t(it - start_value)};
 
           if (fasm_unlikely(*it == '\n')) {
@@ -338,7 +345,7 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
             break;
           }
           annotation_callback(line_number, feature, aname, avalue);
-          ++it; // skip '"'
+          ++it;  // skip '"'
 
           fasm_skip_blank();
         } while (*it == ',');

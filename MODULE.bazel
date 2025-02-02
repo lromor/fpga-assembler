@@ -5,6 +5,7 @@ module(
 
 # Bazel C/C++ language rules and deps.
 bazel_dep(name = "rules_cc", version = "0.0.16")
+
 # Until this is merged: https://github.com/bazelbuild/rules_cc/pull/306
 git_override(
     module_name = "rules_cc",

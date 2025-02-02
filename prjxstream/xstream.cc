@@ -25,19 +25,15 @@ Output is written to stdout.
   }
 
   size_t buf_size = 8192;
-  char *buffer = (char*)malloc(buf_size);
+  char *buffer = (char *)malloc(buf_size);
   while (getline(&buffer, &buf_size, input_stream)) {
     const std::string_view content(buffer, buf_size);
     fasm::Parse(
-        content, stderr,
-        [](uint32_t line, std::string_view feature_name,
-           int start_bit, int width, uint64_t bits) -> bool {
-          return true;
-        },
-        [](uint32_t, std::string_view,
-           std::string_view name, std::string_view value) {
-        });
-
+      content, stderr,
+      [](uint32_t line, std::string_view feature_name, int start_bit, int width,
+         uint64_t bits) -> bool { return true; },
+      [](uint32_t, std::string_view, std::string_view name,
+         std::string_view value) {});
   }
   return 0;
 }
