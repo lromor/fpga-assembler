@@ -61,6 +61,17 @@ struct Tile {
 // an unordered map or flat_hash_map from absl.
 using TileGrid = std::map<std::string, Tile>;
 
-absl::StatusOr<TileGrid> ParseTileGrid(absl::string_view tile_grid_json);
+absl::StatusOr<TileGrid> ParseTileGridJSON(absl::string_view content);
+
+enum class PseudoPIPType {
+  kAlways,
+  kDefault,
+  kHint,
+};
+
+// Pseudo Programmable Interconnect Points.
+using PseudoPIPs = std::map<std::string, PseudoPIPType>;
+
+absl::StatusOr<PseudoPIPs> ParsePseudPIPsDatabase(absl::string_view content);
 }  // namespace prjxstream
 #endif  // PRJXSTREAM_DATABASE_H

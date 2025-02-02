@@ -41,6 +41,7 @@ cc_library(
     deps = [
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/strings:strings",
         "@rapidjson",
     ],
 )

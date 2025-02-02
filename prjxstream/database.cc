@@ -2,6 +2,8 @@
 #include <optional>
 #include <cstdlib>
 
+#include "absl/strings/str_split.h"
+
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "rapidjson/document.h"
 #undef RAPIDJSON_HAS_STDSTRING
@@ -208,17 +210,18 @@ absl::StatusOr<Tile> Unmarshal(const rapidjson::Value &json) {
   ASSIGN_OR_RETURN(tile.prohibited_sites, (GetMember<std::vector<std::string>>(json, "prohibited_sites")));
   return tile;
 }
+
+#undef OK_OR_RETURN
 #undef ASSIGN_OR_RETURN
 #undef ASSIGN_OR_RETURN_IMPL
 #undef STATUS_MACROS_CONCAT_NAME
 #undef STATUS_MACROS_CONCAT_NAME_INNER
-#undef OK_OR_RETURN
 }  // namespace
 
-absl::StatusOr<TileGrid> ParseTileGrid(absl::string_view tile_grid_json) {
+absl::StatusOr<TileGrid> ParseTileGridJSON(const absl::string_view content) {
   rapidjson::Document json;
   rapidjson::ParseResult ok = json.Parse(
-      tile_grid_json.data(), tile_grid_json.size());
+      content.data(), content.size());
   if (!ok) {
     return absl::InvalidArgumentError(
         absl::StrFormat(
@@ -241,5 +244,86 @@ absl::StatusOr<TileGrid> ParseTileGrid(absl::string_view tile_grid_json) {
     tilegrid.insert({name, tile.value()});
   }
   return tilegrid;
+}
+
+namespace {
+// [[unlikely]] only available since c++20, so use gcc/clang builtin here.
+#define unlikely(x) __builtin_expect((x), 0)
+
+// Skip forward until we sit on the '\n' end of current line.
+#define skip_to_eol() while (*it != '\n' && unlikely(it < end)) ++it
+
+using LinesSink = std::function<absl::Status(uint32_t, const absl::string_view)>;
+
+// Given a sequence of characters, calls sink for every subsequence
+// delimited by new lines except for the first and the last.
+absl::Status LinesGenerator(const absl::string_view content, const LinesSink &sink) {
+  if (content.empty()) {
+    return absl::OkStatus();
+  }
+  const char *it = content.begin();
+  const char *const end = content.end();
+  uint32_t line_number = 0;
+  absl::Status status;
+  while (it < end) {
+    ++line_number;
+    const char *const line_start = it;
+    skip_to_eol();
+    status = sink(
+        line_number, absl::string_view(line_start, it - line_start));
+    if (!status.ok()) return status;
+    ++it;  // Skip new line.
+  }
+  return absl::OkStatus();
+}
+#undef skip_to_eol
+#undef unlikely
+
+absl::Status MakeInvalidLineStatus(const uint32_t line_number, absl::string_view message) {
+  return absl::InvalidArgumentError(
+      absl::StrFormat("%d: %s", line_number, message));
+}
+
+absl::Status ParsePseudoPIPTypeFromString(const std::string &value, PseudoPIPType *type) {
+  static const std::map<std::string, PseudoPIPType> pseudo_pip_type_string = {
+    {"always", PseudoPIPType::kAlways},
+    {"default", PseudoPIPType::kDefault},
+    {"hint", PseudoPIPType::kHint},
+  };
+  if (pseudo_pip_type_string.count(value) > 0) {
+    *type = pseudo_pip_type_string.at(value);
+    return absl::OkStatus();
+  }
+  return absl::InvalidArgumentError(
+      absl::StrFormat("invalid pseudo pip state \"%s\"", value));
+}
+
+absl::Status ParsePseudoPIPDatabaseLine(uint32_t line_count, const absl::string_view line, PseudoPIPs &out) {
+  if (line.empty()) return absl::OkStatus();
+  std::vector<std::string> segments = absl::StrSplit(line, ' ', absl::SkipEmpty());
+  if (segments.size() != 2) {
+    return MakeInvalidLineStatus(line_count,
+        absl::StrFormat("invalid line \"%s\"", line));
+  }
+  const std::string &name = segments[0];
+  PseudoPIPType type;
+  absl::Status status = ParsePseudoPIPTypeFromString(segments[1], &type);
+  if (!status.ok()) return status;
+  out.insert({name, type});
+  return absl::OkStatus();
+}
+}  // namespace
+
+absl::StatusOr<PseudoPIPs> ParsePseudPIPsDatabase(const absl::string_view content) {
+  PseudoPIPs pips;
+  if (content.empty()) {
+    return pips;
+  }
+  absl::Status status = LinesGenerator(content, [&pips](
+      uint32_t line_count, const absl::string_view line) -> absl::Status {
+    return ParsePseudoPIPDatabaseLine(line_count, line, pips);
+  });
+  if (!status.ok()) return status;
+  return pips;
 }
 }  // namespace prjxstream

@@ -11,6 +11,7 @@ pkgs.mkShell {
     jdk
     bash
     bant
+    gdb
 
     # For clang-tidy and clang-format.
     clangTools
