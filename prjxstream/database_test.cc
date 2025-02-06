@@ -6,7 +6,7 @@
 
 namespace prjxstream {
 namespace {
-constexpr absl::string_view kSampleTileGrid = R"({
+constexpr absl::string_view kSampleTileGridJSON = R"({
   "TILE_A": {
     "bits": {
       "CLB_IO_CLK": {
@@ -61,7 +61,7 @@ constexpr absl::string_view kSampleTileGrid = R"({
 // Test some basic expectaions for a sample tilegrid.json
 TEST(TileGridParser, SampleTileGrid) {
   absl::StatusOr<TileGrid> tile_grid_result =
-    ParseTileGridJSON(kSampleTileGrid);
+    ParseTileGridJSON(kSampleTileGridJSON);
   EXPECT_TRUE(tile_grid_result.ok());
   const TileGrid &tile_grid = tile_grid_result.value();
   EXPECT_EQ(tile_grid.size(), 2);
@@ -78,15 +78,13 @@ TEST(TileGridParser, SampleTileGrid) {
 
   const Tile &tile_b = tile_grid.at("TILE_B");
   EXPECT_EQ(tile_b.pin_functions.size(), 1);
-  EXPECT_EQ(tile_b.bits.value().count(FrameBlockType::kCLBIOCLK), 1);
+  EXPECT_EQ(tile_b.bits.value().count(ConfigBusType::kCLBIOCLK), 1);
 
-  const BitsBlock &block = tile_b.bits.value().at(FrameBlockType::kCLBIOCLK);
+  const BitsBlock &block = tile_b.bits.value().at(ConfigBusType::kCLBIOCLK);
   EXPECT_TRUE(block.alias.has_value());
   EXPECT_EQ(block.alias.value().sites.size(), 1);
   EXPECT_EQ(block.base_address, 4194304);  // 0x00400000
 }
-
-using TileGridParserTestCaseArray = std::initializer_list<const char *>;
 
 // Inputs that should fail gracefully.
 TEST(TileGridParser, EmptyTileGrid) {
@@ -193,6 +191,216 @@ TEST(SegmentsBitsParser, CanParseSimpleDatabases) {
       }
     }
   }
+}
+
+struct PackagePinsParserTestCase {
+  absl::string_view db;
+  PackagePins expected_package_pins;
+  bool expected_success;
+};
+
+MATCHER(PackagePinEquals, "package pins are equal") {
+  const PackagePin &actual = std::get<0>(arg);
+  const PackagePin &expected = std::get<1>(arg);
+  EXPECT_THAT(
+    actual, ::testing::AllOf(::testing::Field(&PackagePin::pin, expected.pin),
+                             ::testing::Field(&PackagePin::bank, expected.bank),
+                             ::testing::Field(&PackagePin::site, expected.site),
+                             ::testing::Field(&PackagePin::tile, expected.tile),
+                             ::testing::Field(&PackagePin::pin_function,
+                                              expected.pin_function)));
+  return true;
+}
+
+TEST(PackagePinsParser, CanParseSimpleDatabases) {
+  const struct PackagePinsParserTestCase kTestCases[] = {
+    {"pin,bank,site,tile,pin_function\nA1,35,IOB_X1Y81,RIOB33_X43Y81,IO_L9N_T1_"
+     "DQS_AD7N_35",
+     {{"A1", 35, "IOB_X1Y81", "RIOB33_X43Y81", "IO_L9N_T1_DQS_AD7N_35"}},
+     true},
+    // Missing header.
+    {
+      "\nA1,35,IOB_X1Y81,RIOB33_X43Y81,IO_L9N_T1_DQS_AD7N_35",
+      {},
+      false,
+    },
+    // Invalid number of columns.
+    {
+      "pin,bank,site,tile,pin_function\nA1,35,IOB_X1Y81,IO_L9N_T1_DQS_AD7N_35",
+      {},
+      false,
+    },
+    // Multiline weird spacing and empty lines.
+    {
+      "pin,bank,site,tile,pin_function\n"
+      "A1,35,IOB_X1Y81,RIOB33_X43Y81,  IO_L9N_T1_DQS_AD7N_35\n"
+      "\n"
+      "N6,  34,IOB_X1Y13,RIOB33_X43Y13,IO_L18N_T2_34\n",
+      {{"A1", 35, "IOB_X1Y81", "RIOB33_X43Y81", "IO_L9N_T1_DQS_AD7N_35"},
+       {"N6", 34, "IOB_X1Y13", "RIOB33_X43Y13", "IO_L18N_T2_34"}},
+      true,
+    }};
+  for (const auto &test : kTestCases) {
+    const absl::StatusOr<PackagePins> res = ParsePackagePins(test.db);
+    if (!test.expected_success) {
+      EXPECT_FALSE(res.ok()) << absl::StrFormat("for:\n\"%s\"", test.db);
+    } else {
+      ASSERT_TRUE(res.ok())
+        << absl::StrFormat("for:\n\"%s\"\n%s", test.db, res.status().message());
+      const PackagePins &actual = res.value();
+      EXPECT_THAT(actual, ::testing::Pointwise(PackagePinEquals(),
+                                               test.expected_package_pins));
+    }
+  }
+}
+
+constexpr absl::string_view kSamplePartJSON = R"({
+  "global_clock_regions": {
+    "bottom": {
+      "rows": {
+        "0": {
+          "configuration_buses": {
+            "BLOCK_RAM": {
+              "configuration_columns": {
+                "0": {
+                  "frame_count": 128
+                },
+                "1": {
+                  "frame_count": 128
+                }
+              }
+            },
+            "CLB_IO_CLK": {
+              "configuration_columns": {
+                "0": {
+                  "frame_count": 42
+                },
+                "1": {
+                  "frame_count": 30
+                },
+                "2": {
+                  "frame_count": 36
+                },
+                "3": {
+                  "frame_count": 36
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "top": {
+      "rows": {
+        "0": {
+          "configuration_buses": {
+            "BLOCK_RAM": {
+              "configuration_columns": {
+                "0": {
+                  "frame_count": 128
+                },
+                "1": {
+                  "frame_count": 128
+                },
+                "2": {
+                  "frame_count": 128
+                }
+              }
+            },
+            "CLB_IO_CLK": {
+              "configuration_columns": {
+                "0": {
+                  "frame_count": 42
+                },
+                "1": {
+                  "frame_count": 30
+                },
+                "2": {
+                  "frame_count": 36
+                },
+                "3": {
+                  "frame_count": 36
+                },
+                "4": {
+                  "frame_count": 36
+                },
+                "5": {
+                  "frame_count": 36
+                },
+                "6": {
+                  "frame_count": 28
+                },
+                "7": {
+                  "frame_count": 36
+                }
+              }
+            }
+          }
+        },
+        "1": {
+          "configuration_buses": {
+            "BLOCK_RAM": {
+              "configuration_columns": {
+                "0": {
+                  "frame_count": 128
+                },
+                "1": {
+                  "frame_count": 128
+                }
+              }
+            },
+            "CLB_IO_CLK": {
+              "configuration_columns": {
+                "0": {
+                  "frame_count": 42
+                },
+                "1": {
+                  "frame_count": 30
+                },
+                "2": {
+                  "frame_count": 36
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "idcode": 56807571,
+  "iobanks": {
+    "0": "X1Y78",
+    "14": "X1Y26",
+    "15": "X1Y78",
+    "16": "X1Y130",
+    "34": "X113Y26",
+    "35": "X113Y78"
+  }
+})";
+
+// Test some basic expectaions for a sample tilegrid.json
+TEST(PartParser, SamplePart) {
+  absl::StatusOr<Part> part_result = ParsePartJSON(kSamplePartJSON);
+  ASSERT_TRUE(part_result.ok()) << part_result.status().message();
+  const Part &part = part_result.value();
+  EXPECT_EQ(part.idcode, 56807571);
+
+  EXPECT_EQ(part.iobanks.size(), 6);
+  EXPECT_EQ(part.iobanks.count(15), 1);
+  EXPECT_EQ(part.iobanks.at(15), "X1Y78");
+
+  EXPECT_EQ(part.iobanks.count(0), 1);
+  EXPECT_EQ(part.iobanks.count(1), 0);
+
+  // top has two rows, bottom only 1.
+  EXPECT_EQ(part.global_clock_regions.top_rows.size(), 2);
+  EXPECT_EQ(part.global_clock_regions.bottom_rows.size(), 1);
+
+  const ClockRegionRow &row = part.global_clock_regions.top_rows[1];
+  EXPECT_EQ(row.count(ConfigBusType::kCLBIOCLK), 1);
+  const ConfigColumnsFramesCount &counts = row.at(ConfigBusType::kCLBIOCLK);
+  EXPECT_EQ(counts.size(), 3);
+  EXPECT_EQ(counts[2], 36);
 }
 }  // namespace
 }  // namespace prjxstream

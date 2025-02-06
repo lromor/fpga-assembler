@@ -39,6 +39,7 @@ cc_library(
         "database.h",
     ],
     deps = [
+        "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings:string_view",
         "@abseil-cpp//absl/strings:strings",

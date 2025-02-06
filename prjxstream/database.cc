@@ -1,8 +1,12 @@
 #include "prjxstream/database.h"
 
+#include <algorithm>
 #include <cstdlib>
+#include <iterator>
 #include <optional>
 
+#include "absl/log/check.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
 
@@ -11,6 +15,7 @@
 #undef RAPIDJSON_HAS_STDSTRING
 
 #include "rapidjson/error/en.h"
+#include "rapidjson/pointer.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
@@ -64,10 +69,10 @@ const char *JSONTypeString(const rapidjson::Type &type) {
   }
 }
 
-static const std::map<std::string, FrameBlockType> StringToFrameBlock = {
-  {"BLOCK_RAM", FrameBlockType::kBlockRam},
-  {"CLB_IO_CLK", FrameBlockType::kCLBIOCLK},
-};
+static const std::map<std::string, ConfigBusType> StringToConfigBusType = {
+  {"BLOCK_RAM", ConfigBusType::kBlockRam},
+  {"CLB_IO_CLK", ConfigBusType::kCLBIOCLK},
+  {"CFG_CLB", ConfigBusType::kCFGCLB}};
 
 std::string ValueAsString(const rapidjson::Value &json) {
   rapidjson::StringBuffer sb;
@@ -187,11 +192,11 @@ absl::StatusOr<Bits> Unmarshal(const rapidjson::Value &json) {
   Bits bits;
   for (auto it = json.MemberBegin(); it != json.MemberEnd(); ++it) {
     const std::string block_type_string = it->name.GetString();
-    if (!StringToFrameBlock.count(block_type_string)) {
+    if (!StringToConfigBusType.count(block_type_string)) {
       return absl::InvalidArgumentError(
         absl::StrFormat("unknown frame block type \"%s\"", block_type_string));
     }
-    const FrameBlockType type = StringToFrameBlock.at(block_type_string);
+    const ConfigBusType type = StringToConfigBusType.at(block_type_string);
     BitsBlock bits_block;
     ASSIGN_OR_RETURN(bits_block, Unmarshal<BitsBlock>(it->value));
     bits.insert({type, bits_block});
@@ -220,6 +225,126 @@ absl::StatusOr<Tile> Unmarshal(const rapidjson::Value &json) {
   return tile;
 }
 
+template <>
+absl::StatusOr<std::map<uint32_t, std::string>> Unmarshal(
+  const rapidjson::Value &json) {
+  std::map<uint32_t, std::string> out;
+  uint32_t key;
+  for (auto it = json.MemberBegin(); it != json.MemberEnd(); ++it) {
+    const std::string key_string = it->name.GetString();
+    if (!absl::SimpleAtoi(key_string, &key)) {
+      return absl::InvalidArgumentError(absl::StrFormat(
+        "cannot parse \"%s\" for %s", key_string, ValueAsString(json)));
+    }
+    out.insert({key, it->value.GetString()});
+  }
+  return out;
+}
+
+// Wrapped value so to ease specialization.
+struct ConfigColumnsFramesCountInternal {
+  std::vector<uint32_t> value;
+};
+
+template <>
+absl::StatusOr<ConfigColumnsFramesCountInternal> Unmarshal(
+  const rapidjson::Value &json) {
+  OK_OR_RETURN(IsObject(json));
+  ConfigColumnsFramesCountInternal out;
+  int32_t key = -1;
+  uint32_t frame_count;
+  for (auto it = json.MemberBegin(); it != json.MemberEnd(); ++it) {
+    const std::string key_string = it->name.GetString();
+    const int32_t prev = key;
+    if (!absl::SimpleAtoi(key_string, &key)) {
+      return absl::InvalidArgumentError(absl::StrFormat(
+        "cannot parse \"%s\" for %s", key_string, ValueAsString(json)));
+    }
+    // We are assuming a set of keys "0", "1", "2" to be exactly in this order.
+    CHECK(prev == (key - 1)) << "unexpected index";
+    ASSIGN_OR_RETURN(frame_count,
+                     (GetMember<uint32_t>(it->value, "frame_count")));
+    out.value.push_back(frame_count);
+  }
+  return out;
+}
+
+template <>
+absl::StatusOr<ClockRegionRow> Unmarshal(const rapidjson::Value &json) {
+  OK_OR_RETURN(IsObject(json));
+  ClockRegionRow row;
+  for (auto it = json.MemberBegin(); it != json.MemberEnd(); ++it) {
+    const std::string cfg_type_string = it->name.GetString();
+    if (!StringToConfigBusType.count(cfg_type_string)) {
+      return absl::InvalidArgumentError(
+        absl::StrFormat("unknown config bus type \"%s\"", cfg_type_string));
+    }
+    const ConfigBusType type = StringToConfigBusType.at(cfg_type_string);
+    ConfigColumnsFramesCountInternal counts;
+    ASSIGN_OR_RETURN(counts, GetMember<ConfigColumnsFramesCountInternal>(
+                               it->value, "configuration_columns"));
+    row.insert({type, counts.value});
+  }
+  return row;
+}
+
+template <>
+absl::StatusOr<GlobalClockRegionHalf> Unmarshal(const rapidjson::Value &json) {
+  OK_OR_RETURN(IsObject(json));
+  std::vector<ClockRegionRow> half;
+  ClockRegionRow row;
+  int32_t key = -1;
+  for (auto it = json.MemberBegin(); it != json.MemberEnd(); ++it) {
+    const std::string key_string = it->name.GetString();
+    const int32_t prev = key;
+    if (!absl::SimpleAtoi(key_string, &key)) {
+      return absl::InvalidArgumentError(absl::StrFormat(
+        "cannot parse \"%s\" for %s", key_string, ValueAsString(json)));
+    }
+    // We are assuming a set of keys "0", "1", "2" to be exactly in this order.
+    CHECK(prev == (key - 1)) << "json key not in sequence";
+    ASSIGN_OR_RETURN(
+      row, (GetMember<ClockRegionRow>(it->value, "configuration_buses")));
+    half.push_back(row);
+  }
+  return half;
+}
+
+template <>
+absl::StatusOr<GlobalClockRegions> Unmarshal(const rapidjson::Value &json) {
+  GlobalClockRegions regions;
+  static const std::string kBottomRowsAttribute = "/bottom/rows";
+  const rapidjson::Value *bottom_rows =
+    rapidjson::Pointer(kBottomRowsAttribute.c_str()).Get(json);
+  if (bottom_rows == nullptr) {
+    return absl::InvalidArgumentError(
+      "could not find global_clock_region bottom rows");
+  }
+  ASSIGN_OR_RETURN(regions.bottom_rows,
+                   Unmarshal<GlobalClockRegionHalf>(*bottom_rows));
+  static const std::string kTopRowsAttribute = "/top/rows";
+  const rapidjson::Value *top_rows =
+    rapidjson::Pointer(kTopRowsAttribute.c_str()).Get(json);
+  if (top_rows == nullptr) {
+    return absl::InvalidArgumentError(
+      "could not find global_clock_region top rows");
+  }
+  ASSIGN_OR_RETURN(regions.top_rows,
+                   Unmarshal<GlobalClockRegionHalf>(*top_rows));
+  return regions;
+}
+
+template <>
+absl::StatusOr<Part> Unmarshal(const rapidjson::Value &json) {
+  struct Part part;
+  OK_OR_RETURN(IsObject(json));
+  ASSIGN_OR_RETURN(part.idcode, GetMember<uint32_t>(json, "idcode"));
+  ASSIGN_OR_RETURN(part.iobanks, (GetMember<std::map<uint32_t, std::string>>(
+                                   json, "iobanks")));
+  ASSIGN_OR_RETURN(part.global_clock_regions, (GetMember<GlobalClockRegions>(
+                                                json, "global_clock_regions")));
+  return part;
+}
 #undef OK_OR_RETURN
 #undef ASSIGN_OR_RETURN
 #undef ASSIGN_OR_RETURN_IMPL
@@ -313,7 +438,7 @@ absl::Status ParsePseudoPIPDatabaseLine(uint32_t line_count,
                                         TileTypePseudoPIPs &out) {
   if (line.empty()) return absl::OkStatus();
   std::vector<std::string> segments =
-    absl::StrSplit(line, ' ', absl::SkipEmpty());
+    absl::StrSplit(line, absl::ByAsciiWhitespace(), absl::SkipEmpty());
   if (segments.size() != 2) {
     return MakeInvalidLineStatus(line_count,
                                  absl::StrFormat("invalid line \"%s\"", line));
@@ -347,7 +472,7 @@ absl::Status ParseSegmentsBitsDatabaseLine(uint32_t line_count,
                                            const absl::string_view line,
                                            TileTypeSegmentsBits &out) {
   std::vector<std::string> segments =
-    absl::StrSplit(line, ' ', absl::SkipEmpty());
+    absl::StrSplit(line, absl::ByAsciiWhitespace(), absl::SkipEmpty());
   if (segments.empty()) return absl::OkStatus();
   if (segments.size() == 1) {
     return MakeInvalidLineStatus(line_count,
@@ -395,5 +520,87 @@ absl::StatusOr<TileTypeSegmentsBits> ParseSegmentsBitsDatabase(
     });
   if (!status.ok()) return status;
   return segbits;
+}
+
+namespace {
+bool IsValidPackagePinCSVHeader(const std::vector<std::string> &segments) {
+  constexpr absl::string_view kHeader[] = {
+    "pin", "bank", "site", "tile", "pin_function",
+  };
+  if (segments.size() != std::size(kHeader)) {
+    return false;
+  }
+  for (size_t i = 0; i < std::size(kHeader); ++i) {
+    if (segments[i] != kHeader[i]) return false;
+  }
+  return true;
+}
+
+std::vector<std::string> StripAsciiWhitespaces(
+  const std::vector<std::string> &src) {
+  std::vector<std::string> out;
+  std::transform(src.begin(), src.end(), std::back_inserter(out),
+                 [](const std::string &s) -> std::string {
+                   return std::string(absl::StripAsciiWhitespace(s));
+                 });
+  return out;
+}
+
+absl::Status ParsePackagePinCSVLine(uint32_t line_count,
+                                    const absl::string_view line,
+                                    PackagePins &out) {
+  std::vector<std::string> segments =
+    StripAsciiWhitespaces(absl::StrSplit(line, ',', absl::SkipEmpty()));
+  // First line, it's header, check it and skip.
+  if (line_count == 1) {
+    if (!IsValidPackagePinCSVHeader(segments)) {
+      return MakeInvalidLineStatus(line_count, "missing header");
+    }
+    return absl::OkStatus();
+  }
+  if (segments.empty()) return absl::OkStatus();
+  if (segments.size() != 5) {
+    return MakeInvalidLineStatus(line_count,
+                                 absl::StrFormat("invalid line \"%s\"", line));
+  }
+  PackagePin pp;
+  pp.pin = segments[0];
+  if (!absl::SimpleAtoi(segments[1], &pp.bank)) {
+    return MakeInvalidLineStatus(
+      line_count,
+      absl::StrFormat("could not parse bank (second column) \"%s\"", line));
+  }
+  pp.site = segments[2];
+  pp.tile = segments[3];
+  pp.pin_function = segments[4];
+  out.push_back(pp);
+  return absl::OkStatus();
+}
+}  // namespace
+
+absl::StatusOr<PackagePins> ParsePackagePins(absl::string_view content) {
+  PackagePins package_pins;
+  if (content.empty()) {
+    return package_pins;
+  }
+  absl::Status status = LinesGenerator(
+    content,
+    [&package_pins](uint32_t line_count,
+                    const absl::string_view line) -> absl::Status {
+      return ParsePackagePinCSVLine(line_count, line, package_pins);
+    });
+  if (!status.ok()) return status;
+  return package_pins;
+}
+
+absl::StatusOr<Part> ParsePartJSON(const absl::string_view content) {
+  rapidjson::Document json;
+  rapidjson::ParseResult ok = json.Parse(content.data(), content.size());
+  if (!ok) {
+    return absl::InvalidArgumentError(
+      absl::StrFormat("json parsing error, %s (%u)",
+                      rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+  }
+  return Unmarshal<Part>(json);
 }
 }  // namespace prjxstream
