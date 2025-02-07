@@ -86,7 +86,6 @@ TEST(TileGridParser, SampleTileGrid) {
   EXPECT_EQ(block.base_address, 4194304);  // 0x00400000
 }
 
-// Inputs that should fail gracefully.
 TEST(TileGridParser, EmptyTileGrid) {
   constexpr absl::string_view kExpectFailTests[] = {"",     "[]", "  ",
                                                     "\n\n", "32", "asd",
@@ -378,7 +377,6 @@ constexpr absl::string_view kSamplePartJSON = R"({
   }
 })";
 
-// Test some basic expectaions for a sample tilegrid.json
 TEST(PartParser, SamplePart) {
   absl::StatusOr<Part> part_result = ParsePartJSON(kSamplePartJSON);
   ASSERT_TRUE(part_result.ok()) << part_result.status().message();
@@ -401,6 +399,63 @@ TEST(PartParser, SamplePart) {
   const ConfigColumnsFramesCount &counts = row.at(ConfigBusType::kCLBIOCLK);
   EXPECT_EQ(counts.size(), 3);
   EXPECT_EQ(counts[2], 36);
+}
+
+
+constexpr absl::string_view kSamplePartsMapperYAML = R"(
+xc7a100tcsg324-3:
+  device: xc7a100t
+  package: csg324
+  speedgrade: '3'
+xc7a35tcpg236-2L:
+  device: xc7a35t
+  package: cpg236
+  speedgrade: 2L
+xc7a50tcpg236-1:
+  device: xc7a50t
+  package: cpg236
+  speedgrade: '1'
+)";
+
+constexpr absl::string_view kSampleDevicesMapperYAML = R"(
+"xc7a100t":
+  fabric: "xc7a100t"
+"xc7a50t":
+  fabric: "xc7a50t"
+"xc7a35t":
+  fabric: "xc7a50t"
+)";
+
+// Test some basic expectaions for a sample tilegrid.json
+TEST(PartInfoParser, SamplePartsAndDevices) {
+  absl::StatusOr<std::map<std::string, PartInfo>> parts_infos_result =
+      ParsePartInfo(kSamplePartsMapperYAML, kSampleDevicesMapperYAML);
+  ASSERT_TRUE(parts_infos_result.ok()) << parts_infos_result.status().message();
+  const std::map<std::string, PartInfo> &parts_infos = parts_infos_result.value();
+  {
+    const std::string kPartName = "xc7a100tcsg324-3";
+    const PartInfo &info = parts_infos.at(kPartName);
+    EXPECT_EQ(info.device, "xc7a100t");
+    EXPECT_EQ(info.package, "csg324");
+    EXPECT_EQ(info.speedgrade, "3");
+    EXPECT_EQ(info.fabric, "xc7a100t");
+  }
+  {
+    const std::string kPartName = "xc7a35tcpg236-2L";
+    const PartInfo &info = parts_infos.at(kPartName);
+    EXPECT_EQ(info.device, "xc7a35t");
+    EXPECT_EQ(info.package, "cpg236");
+    EXPECT_EQ(info.speedgrade, "2L");
+    EXPECT_EQ(info.fabric, "xc7a50t");
+  }
+  {
+    const std::string kPartName = "xc7a50tcpg236-1";
+    const PartInfo &info = parts_infos.at(kPartName);
+    EXPECT_EQ(info.device, "xc7a50t");
+    EXPECT_EQ(info.package, "cpg236");
+    EXPECT_EQ(info.speedgrade, "1");
+    EXPECT_EQ(info.fabric, "xc7a50t");
+  }
 }
 }  // namespace
 }  // namespace prjxstream

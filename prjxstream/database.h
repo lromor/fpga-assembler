@@ -109,7 +109,7 @@ using PackagePins = std::vector<PackagePin>;
 // pin,bank,site,tile,pin_function.
 absl::StatusOr<PackagePins> ParsePackagePins(absl::string_view content);
 
-using IOBanks = std::map<uint32_t, std::string>;
+using IOBanksIDsToLocation = std::map<uint32_t, std::string>;
 
 // For each column index, associate a number of frames.
 using ConfigColumnsFramesCount = std::vector<uint32_t>;
@@ -126,9 +126,19 @@ struct GlobalClockRegions {
 struct Part {
   GlobalClockRegions global_clock_regions;
   uint32_t idcode;
-  IOBanks iobanks;
+  IOBanksIDsToLocation iobanks;
 };
 
 absl::StatusOr<Part> ParsePartJSON(absl::string_view content);
+
+struct PartInfo {
+  std::string device;
+  std::string fabric;
+  std::string package;
+  std::string speedgrade;
+};
+
+absl::StatusOr<std::map<std::string, PartInfo>> ParsePartInfo(
+    absl::string_view parts_mapper_yaml, absl::string_view devices_mapper_yaml);
 }  // namespace prjxstream
 #endif  // PRJXSTREAM_DATABASE_H

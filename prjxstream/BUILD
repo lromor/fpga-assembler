@@ -69,6 +69,38 @@ cc_test(
     ],
 )
 
+cc_library(
+    name = "banks-tiles-registry",
+    srcs = [
+        "banks-tiles-registry.cc",
+    ],
+    hdrs = [
+        "banks-tiles-registry.h",
+    ],
+    deps = [
+        ":database",
+        ":memory-mapped-file",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/strings:strings",
+    ],
+)
+
+cc_test(
+    name = "banks-tiles-registry_test",
+    srcs = [
+        "banks-tiles-registry_test.cc",
+    ],
+    deps = [
+        ":banks-tiles-registry",
+        ":database",
+        "@abseil-cpp//absl/strings:string_view",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_binary(
     name = "xstream",
     srcs = [
@@ -76,7 +108,12 @@ cc_binary(
     ],
     deps = [
         ":fasm-parser",
+        ":database",
         ":memory-mapped-file",
+        ":banks-tiles-registry",
         "@abseil-cpp//absl/strings:strings",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:usage",
+        "@abseil-cpp//absl/flags:parse",
     ],
 )

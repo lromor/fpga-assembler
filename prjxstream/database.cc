@@ -603,4 +603,169 @@ absl::StatusOr<Part> ParsePartJSON(const absl::string_view content) {
   }
   return Unmarshal<Part>(json);
 }
+
+namespace {
+// Sink that gets called with the key as first argument and a set of properties for the second
+// associated with that key.
+using KeyPropsSink = std::function<absl::Status(
+    absl::string_view, const std::map<std::string, std::string> &)>;
+
+// Helper function that removes matching surrounding quotes (either single or double)
+// from the given string view.
+absl::string_view RemoveSurroundingQuotes(absl::string_view s) {
+  if (s.size() >= 2) {
+    const char first = s.front();
+    const char last = s.back();
+    if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+      s.remove_prefix(1);
+      s.remove_suffix(1);
+    }
+  }
+  return s;
+}
+// Parses a YAML mapping from the provided content. It will invoke the provided sink
+// for each top-level key and its associated mapping (nested properties).
+//
+// This function supports two variants of YAML data. For example:
+//
+//   # Variant 1
+//   "xc7a200t":
+//     fabric: "xc7a200t"
+//   "xc7a100t":
+//     fabric: "xc7a100t"
+//
+//   # Variant 2
+//   xc7a100tcsg324-3:
+//     device: xc7a100t
+//     package: csg324
+//     speedgrade: '3'
+//
+// Nested lines must have at least one level of indentation, and top-level lines
+// must end with a colon.
+absl::Status ParseMappingYAML(const absl::string_view content, const KeyPropsSink &sink) {
+  std::vector<absl::string_view> lines = absl::StrSplit(content, '\n');
+  std::string current_key;
+  std::map<std::string, std::string> properties;
+
+  for (absl::string_view line : lines) {
+    // Remove surrounding whitespace.
+    absl::string_view trimmed = absl::StripAsciiWhitespace(line);
+
+    // Skip empty lines and comment lines.
+    if (trimmed.empty() || trimmed.front() == '#') {
+      continue;
+    }
+
+    // Compute the indentation level (number of leading spaces).
+    int indent = line.size() - absl::StripLeadingAsciiWhitespace(line).size();
+
+    if (indent == 0) {
+      // Flush any previous mapping entry.
+      if (!current_key.empty()) {
+        absl::Status st = sink(current_key, properties);
+        if (!st.ok()) {
+          return st;
+        }
+      }
+
+      // Expect a top-level key line ending with a colon.
+      if (!absl::ConsumeSuffix(&trimmed, ":")) {
+        return absl::InvalidArgumentError("Top-level key missing trailing colon");
+      }
+
+      // Remove any surrounding quotes.
+      trimmed = RemoveSurroundingQuotes(trimmed);
+      current_key = std::string(trimmed);
+      properties.clear();  // Reset properties for the new entry.
+    } else {
+      // Nested line: expect a key-value pair separated by a colon.
+      size_t colon_pos = trimmed.find(':');
+      if (colon_pos == absl::string_view::npos) {
+        return absl::InvalidArgumentError("Nested key-value pair missing colon");
+      }
+
+      absl::string_view key = absl::StripAsciiWhitespace(trimmed.substr(0, colon_pos));
+      absl::string_view value = absl::StripAsciiWhitespace(trimmed.substr(colon_pos + 1));
+
+      // Remove surrounding quotes from the value if any.
+      value = RemoveSurroundingQuotes(value);
+
+      properties[std::string(key)] = std::string(value);
+    }
+  }
+
+  // Flush the last mapping if present.
+  if (!current_key.empty()) {
+    absl::Status st = sink(current_key, properties);
+    if (!st.ok()) {
+      return st;
+    }
+  }
+
+  return absl::OkStatus();
+}
+
+struct MapperParts {
+  std::string device;
+  std::string package;
+  std::string speedgrade;
+};
+
+struct MapperDevices {
+  std::string fabric;
+};
+
+template<typename K, typename V>
+absl::Status ValueOrStatus(std::map<K, V> map, const K &key, V &value) {
+  if (map.count(key) == 0) {
+    return absl::InvalidArgumentError(
+        absl::StrFormat("key \"%s\" not found", std::string(key)));
+  }
+  value = map.at(key);
+  return absl::OkStatus();
+}
+}  // namespace
+absl::StatusOr<std::map<std::string, PartInfo>> ParsePartInfo(
+    absl::string_view parts_mapper_yaml, absl::string_view devices_mapper_yaml) {
+  // First map device to fabric.
+  std::map<std::string, std::string> fabrics;
+  absl::Status status = ParseMappingYAML(
+      devices_mapper_yaml,
+      [&fabrics](absl::string_view part, const std::map<std::string, std::string> &props) -> absl::Status {
+        constexpr const char *kFabricProperty = "fabric";
+        if (props.count(kFabricProperty) == 0) {
+          return absl::InvalidArgumentError("parts yaml doesn't contain fabric");
+        }
+        const std::string &fabric = props.at(kFabricProperty);
+        fabrics.insert({std::string(part), fabric});
+        return absl::OkStatus();
+      });
+  if (!status.ok()) return status;
+  std::map<std::string, PartInfo> parts_infos;
+  // First fill-in all the parts map.
+  status = ParseMappingYAML(
+      parts_mapper_yaml,
+      [&fabrics, &parts_infos](
+          absl::string_view part, const std::map<std::string, std::string> &props) -> absl::Status {
+        absl::Status status;
+        PartInfo info;
+        status = ValueOrStatus<std::string, std::string>(props, "device", info.device);
+        if (!status.ok()) return status;
+        status = ValueOrStatus<std::string, std::string>(props, "package", info.package);
+        if (!status.ok()) return status;
+        status = ValueOrStatus<std::string, std::string>(props, "speedgrade", info.speedgrade);
+        if (!status.ok()) return status;
+
+        // Get the fabric.
+        if (!fabrics.count(info.device)) {
+          return absl::InvalidArgumentError(
+              absl::StrFormat("could not find fabric for device: \"%s\"", info.device));
+        }
+        info.fabric = fabrics.at(info.device);
+        parts_infos.insert({std::string(part), info});
+        return absl::OkStatus();
+  });
+  if (!status.ok()) return status;
+ return parts_infos;
+}
 }  // namespace prjxstream
