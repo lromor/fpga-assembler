@@ -1,5 +1,5 @@
 module(
-    name = "prjxstream",
+    name = "xstream",
     version = "0.0.1",
 )
 
