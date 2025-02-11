@@ -58,7 +58,7 @@ cc_test(
         "database_test.cc",
     ],
     data = [
-        "//prjxstream:testdata",
+        "//xstream:testdata",
     ],
     deps = [
         ":database",

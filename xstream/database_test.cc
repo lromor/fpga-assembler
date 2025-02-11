@@ -1,10 +1,10 @@
-#include "prjxstream/database.h"
+#include "xstream/database.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace prjxstream {
+namespace xstream {
 namespace {
 constexpr absl::string_view kSampleTileGridJSON = R"({
   "TILE_A": {
@@ -458,4 +458,4 @@ TEST(PartsInfosParser, SamplePartsAndDevices) {
   }
 }
 }  // namespace
-}  // namespace prjxstream
+}  // namespace xstream

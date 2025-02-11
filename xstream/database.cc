@@ -1,4 +1,4 @@
-#include "prjxstream/database.h"
+#include "xstream/database.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -19,7 +19,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
-namespace prjxstream {
+namespace xstream {
 namespace {
 template <typename T>
 absl::Status DoAssignOrReturn(T &lhs, absl::StatusOr<T> result) {
@@ -768,4 +768,4 @@ absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
   if (!status.ok()) return status;
  return parts_infos;
 }
-}  // namespace prjxstream
+}  // namespace xstream

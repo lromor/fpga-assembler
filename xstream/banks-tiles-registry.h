@@ -1,11 +1,11 @@
-#ifndef PRJXSTREAM_BANKS_TILES_REGISTRY_H
-#define PRJXSTREAM_BANKS_TILES_REGISTRY_H
+#ifndef XSTREAM_BANKS_TILES_REGISTRY_H
+#define XSTREAM_BANKS_TILES_REGISTRY_H
 
 #include <utility>
 
-#include "prjxstream/database.h"
+#include "xstream/database.h"
 
-namespace prjxstream {
+namespace xstream {
 // Get all tiles associated with an IO bank.
 // Allows also to query for an IO bank from a tile.
 class BanksTilesRegistry {
@@ -32,5 +32,5 @@ class BanksTilesRegistry {
   const tile_to_bank_type tile_to_bank_;
   const banks_to_tiles_type banks_to_tiles_;
 };
-}  // namespace prjxstream
-#endif  // PRJXSTREAM_BANKS_TILES_REGISTRY_H
+}  // namespace xstream
+#endif  // XSTREAM_BANKS_TILES_REGISTRY_H

@@ -1,7 +1,7 @@
-#ifndef PRJXSTREAM_DATABASE_H
-#define PRJXSTREAM_DATABASE_H
+#ifndef XSTREAM_DATABASE_H
+#define XSTREAM_DATABASE_H
 
-namespace prjxstream {
+namespace xstream {
 class FasmAssembler {
  public:
   FasmAssembler() {
@@ -11,4 +11,4 @@ class FasmAssembler {
 };
 }
 
-#endif  // PRJXSTREAM_FASM_ASSEMBLER_H
+#endif  // XSTREAM_FASM_ASSEMBLER_H

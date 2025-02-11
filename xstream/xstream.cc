@@ -11,36 +11,36 @@
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 
-#include "prjxstream/database.h"
-#include "prjxstream/fasm-parser.h"
-#include "prjxstream/banks-tiles-registry.h"
-#include "prjxstream/memory-mapped-file.h"
+#include "xstream/database.h"
+#include "xstream/fasm-parser.h"
+#include "xstream/banks-tiles-registry.h"
+#include "xstream/memory-mapped-file.h"
 
-absl::StatusOr<prjxstream::BanksTilesRegistry> CreateBanksRegistry(
+absl::StatusOr<xstream::BanksTilesRegistry> CreateBanksRegistry(
     absl::string_view part_json_path,
     absl::string_view package_pins_path) {
   // Parse part.json.
-  const absl::StatusOr<std::unique_ptr<prjxstream::MemoryBlock>> part_json_result =
-      prjxstream::MemoryMapFile(part_json_path);
+  const absl::StatusOr<std::unique_ptr<xstream::MemoryBlock>> part_json_result =
+      xstream::MemoryMapFile(part_json_path);
   if (!part_json_result.ok()) return part_json_result.status();
-  const absl::StatusOr<prjxstream::Part> part_result =
-      prjxstream::ParsePartJSON(part_json_result.value()->AsStringVew());
+  const absl::StatusOr<xstream::Part> part_result =
+      xstream::ParsePartJSON(part_json_result.value()->AsStringVew());
   if (!part_result.ok()) {
     return part_result.status();
   }
-  const prjxstream::Part &part = part_result.value();
+  const xstream::Part &part = part_result.value();
 
   // Parse package pins.
-  const absl::StatusOr<std::unique_ptr<prjxstream::MemoryBlock>> package_pins_csv_result =
-      prjxstream::MemoryMapFile(package_pins_path);
+  const absl::StatusOr<std::unique_ptr<xstream::MemoryBlock>> package_pins_csv_result =
+      xstream::MemoryMapFile(package_pins_path);
   if (!package_pins_csv_result.ok()) return package_pins_csv_result.status();
-  const absl::StatusOr<prjxstream::PackagePins> package_pins_result =
-      prjxstream::ParsePackagePins(package_pins_csv_result.value()->AsStringVew());
+  const absl::StatusOr<xstream::PackagePins> package_pins_result =
+      xstream::ParsePackagePins(package_pins_csv_result.value()->AsStringVew());
   if (!package_pins_result.ok()) {
     return package_pins_result.status();
   }
-  const prjxstream::PackagePins &package_pins = package_pins_result.value();
-  return prjxstream::BanksTilesRegistry::Create(part, package_pins);
+  const xstream::PackagePins &package_pins = package_pins_result.value();
+  return xstream::BanksTilesRegistry::Create(part, package_pins);
 }
 
 struct TileSiteInfo {
@@ -49,10 +49,10 @@ struct TileSiteInfo {
 };
 
 absl::StatusOr<std::optional<TileSiteInfo>> FindPUDCBTileSite(
-  const prjxstream::TileGrid &tilegrid) {
+  const xstream::TileGrid &tilegrid) {
   for (const auto &p : tilegrid) {
     const std::string &tile = p.first;
-    const prjxstream::Tile &tileinfo = p.second;
+    const xstream::Tile &tileinfo = p.second;
     int y_coord;
     for (const auto &functions_kv : tileinfo.pin_functions) {
       const std::string &site = functions_kv.first;
@@ -96,40 +96,40 @@ static std::string StatusToErrorMessage(absl::string_view message, const absl::S
   return absl::StrFormat("%s: %s", message, status.message());
 }
 
-static absl::StatusOr<prjxstream::PartInfo> ParsePartInfo(
+static absl::StatusOr<xstream::PartInfo> ParsePartInfo(
     const std::filesystem::path &prjxray_db_path, const std::string &part) {
   const auto parts_yaml_content_result =
-      prjxstream::MemoryMapFile(prjxray_db_path / "mapping" / "parts.yaml");
+      xstream::MemoryMapFile(prjxray_db_path / "mapping" / "parts.yaml");
   if (!parts_yaml_content_result.ok()) {
     return parts_yaml_content_result.status();
   }
   const auto devices_yaml_content_result =
-      prjxstream::MemoryMapFile(prjxray_db_path / "mapping" / "devices.yaml");
+      xstream::MemoryMapFile(prjxray_db_path / "mapping" / "devices.yaml");
   if (!devices_yaml_content_result.ok()) {
     return devices_yaml_content_result.status();
   }
-  const absl::StatusOr<std::map<std::string, prjxstream::PartInfo>> parts_infos_result =
-    prjxstream::ParsePartsInfos(
+  const absl::StatusOr<std::map<std::string, xstream::PartInfo>> parts_infos_result =
+    xstream::ParsePartsInfos(
       parts_yaml_content_result.value()->AsStringVew(),
       devices_yaml_content_result.value()->AsStringVew());
   if (!parts_infos_result.ok()) {
     return parts_infos_result.status();
   }
-  const std::map<std::string, prjxstream::PartInfo> &parts_infos = parts_infos_result.value();
+  const std::map<std::string, xstream::PartInfo> &parts_infos = parts_infos_result.value();
   if (!parts_infos.count(part)) {
     return absl::InvalidArgumentError(absl::StrFormat("invalid or unknown part \"%s\"", part));
   }
   return parts_infos.at(part);
 }
 
-static absl::StatusOr<prjxstream::TileGrid> ParseTileGrid(
-  const std::filesystem::path &prjxray_db_path, const prjxstream::PartInfo &part_info) {
+static absl::StatusOr<xstream::TileGrid> ParseTileGrid(
+  const std::filesystem::path &prjxray_db_path, const xstream::PartInfo &part_info) {
   const auto tilegrid_json_content_result =
-      prjxstream::MemoryMapFile(prjxray_db_path / part_info.fabric / "tilegrid.json");
+      xstream::MemoryMapFile(prjxray_db_path / part_info.fabric / "tilegrid.json");
   if (!tilegrid_json_content_result.ok()) {
     return tilegrid_json_content_result.status();
   }
-  return prjxstream::ParseTileGridJSON(
+  return xstream::ParseTileGridJSON(
       tilegrid_json_content_result.value()->AsStringVew());
 }
 
@@ -199,17 +199,17 @@ int main(int argc, char *argv[]) {
     std::cerr << absl::ProgramUsageMessage() << std::endl;
     return EXIT_FAILURE;
   }
-  const absl::StatusOr<prjxstream::PartInfo> part_info_result = ParsePartInfo(
+  const absl::StatusOr<xstream::PartInfo> part_info_result = ParsePartInfo(
       prjxray_db_path, part);
   if (!part_info_result.ok()) {
     std::cerr << StatusToErrorMessage("part mapping parsing", part_info_result.status())
               << std::endl;
     return EXIT_FAILURE;
   }
-  const prjxstream::PartInfo &part_info = part_info_result.value();
+  const xstream::PartInfo &part_info = part_info_result.value();
 
   // Parse tilegrid.
-  const absl::StatusOr<prjxstream::TileGrid> tilegrid_result =
+  const absl::StatusOr<xstream::TileGrid> tilegrid_result =
       ParseTileGrid(prjxray_db_path, part_info);
   if (!tilegrid_result.ok()) {
     std::cerr << StatusToErrorMessage("tilegrid parsing", part_info_result.status())

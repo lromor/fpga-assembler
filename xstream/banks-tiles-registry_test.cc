@@ -1,10 +1,10 @@
-#include "prjxstream/banks-tiles-registry.h"
+#include "xstream/banks-tiles-registry.h"
 #include <unordered_set>
-#include "prjxstream/database.h"
+#include "xstream/database.h"
 
 #include "gtest/gtest.h"
 
-namespace prjxstream {
+namespace xstream {
 namespace {
 struct CorrectMappingAndTileNamesTestCase {
   Part part;
@@ -58,4 +58,4 @@ TEST(BanksTilesRegistry, CorrectMappingAndTileNames) {
   }
 }
 }  // namespace
-}  // namespace prjxstream
+}  // namespace xstream

@@ -14,8 +14,8 @@
 
 // Simple single-header parser for FPGA assembly file format.
 
-#ifndef PRJXSTREAM_FASM_PARSER_H
-#define PRJXSTREAM_FASM_PARSER_H
+#ifndef XSTREAM_FASM_PARSER_H
+#define XSTREAM_FASM_PARSER_H
 
 #include <algorithm>
 #include <cinttypes>
@@ -381,4 +381,4 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
 #undef fasm_unlikely
 
 }  // namespace fasm
-#endif  // PRJXSTREAM_FASM_PARSER_H
+#endif  // XSTREAM_FASM_PARSER_H

@@ -1,12 +1,12 @@
-#ifndef PRJXSTREAM_MEM_BLOCK_H
-#define PRJXSTREAM_MEM_BLOCK_H
+#ifndef XSTREAM_MEM_BLOCK_H
+#define XSTREAM_MEM_BLOCK_H
 
 #include <filesystem>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
-namespace prjxstream {
+namespace xstream {
 // Taken from: verible/common/strings/mem-block.h
 class MemoryBlock {
  public:
@@ -30,5 +30,5 @@ inline absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
     const std::filesystem::path &path) {
   return MemoryMapFile(absl::string_view(std::string(path)));
 }
-}  // namespace prjxstream
-#endif  // PRJXSTREAM_MEM_BLOCK_H
+}  // namespace xstream
+#endif  // XSTREAM_MEM_BLOCK_H

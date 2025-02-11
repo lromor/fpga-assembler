@@ -1,7 +1,7 @@
-#include "prjxstream/banks-tiles-registry.h"
+#include "xstream/banks-tiles-registry.h"
 #include <unordered_set>
 
-namespace prjxstream {
+namespace xstream {
 absl::StatusOr<BanksTilesRegistry> BanksTilesRegistry::Create(const Part &part, const PackagePins &package_pins) {
   std::map<std::string, uint32_t> tile_to_bank;
   std::map<uint32_t, std::unordered_set<std::string>> banks_to_tiles_set;
@@ -43,4 +43,4 @@ std::optional<uint32_t> BanksTilesRegistry::TileBank(const std::string &tile) co
   }
   return tile_to_bank_.at(tile);
 }
-}  // namespace prjxstream
+}  // namespace xstream

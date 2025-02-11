@@ -1,5 +1,5 @@
-#ifndef PRJXSTREAM_DATABASE_H
-#define PRJXSTREAM_DATABASE_H
+#ifndef XSTREAM_DATABASE_H
+#define XSTREAM_DATABASE_H
 
 #include <cstdint>
 #include <map>
@@ -9,7 +9,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
-namespace prjxstream {
+namespace xstream {
 enum class ConfigBusType {
   kCLBIOCLK,
   kBlockRam,
@@ -140,5 +140,5 @@ struct PartInfo {
 
 absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
     absl::string_view parts_mapper_yaml, absl::string_view devices_mapper_yaml);
-}  // namespace prjxstream
-#endif  // PRJXSTREAM_DATABASE_H
+}  // namespace xstream
+#endif  // XSTREAM_DATABASE_H
