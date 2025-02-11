@@ -725,7 +725,7 @@ absl::Status ValueOrStatus(std::map<K, V> map, const K &key, V &value) {
   return absl::OkStatus();
 }
 }  // namespace
-absl::StatusOr<std::map<std::string, PartInfo>> ParsePartInfo(
+absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
     absl::string_view parts_mapper_yaml, absl::string_view devices_mapper_yaml) {
   // First map device to fabric.
   std::map<std::string, std::string> fabrics;

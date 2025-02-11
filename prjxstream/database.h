@@ -138,7 +138,7 @@ struct PartInfo {
   std::string speedgrade;
 };
 
-absl::StatusOr<std::map<std::string, PartInfo>> ParsePartInfo(
+absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
     absl::string_view parts_mapper_yaml, absl::string_view devices_mapper_yaml);
 }  // namespace prjxstream
 #endif  // PRJXSTREAM_DATABASE_H

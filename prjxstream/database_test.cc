@@ -427,9 +427,9 @@ constexpr absl::string_view kSampleDevicesMapperYAML = R"(
 )";
 
 // Test some basic expectaions for a sample tilegrid.json
-TEST(PartInfoParser, SamplePartsAndDevices) {
+TEST(PartsInfosParser, SamplePartsAndDevices) {
   absl::StatusOr<std::map<std::string, PartInfo>> parts_infos_result =
-      ParsePartInfo(kSamplePartsMapperYAML, kSampleDevicesMapperYAML);
+      ParsePartsInfos(kSamplePartsMapperYAML, kSampleDevicesMapperYAML);
   ASSERT_TRUE(parts_infos_result.ok()) << parts_infos_result.status().message();
   const std::map<std::string, PartInfo> &parts_infos = parts_infos_result.value();
   {
