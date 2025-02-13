@@ -35,6 +35,7 @@ Checks: >
   -modernize-use-nodiscard,
   -modernize-use-std-print,
   -modernize-use-trailing-return-type,
+  -modernize-concat-nested-namespaces,
   misc-*,
   -misc-no-recursion,
   -misc-unused-parameters,

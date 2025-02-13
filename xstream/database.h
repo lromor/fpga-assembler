@@ -2,143 +2,69 @@
 #define XSTREAM_DATABASE_H
 
 #include <cstdint>
-#include <map>
-#include <string>
+#include <memory>
 #include <vector>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
+#include "xstream/database-parsers.h"
+
 namespace xstream {
-enum class ConfigBusType {
-  kCLBIOCLK,
-  kBlockRam,
-  kCFGCLB,
+// Get all tiles associated with an IO bank.
+// Allows also to query for an IO bank from a tile.
+class BanksTilesRegistry {
+  using tile_to_bank_type = std::map<std::string, uint32_t>;
+  using banks_to_tiles_type = std::map<uint32_t, std::vector<std::string>>;
+
+ public:
+  using const_iterator = banks_to_tiles_type::const_iterator;
+  const_iterator begin() const { return banks_to_tiles_.begin(); }
+  const_iterator end() const { return banks_to_tiles_.end(); }
+
+  static absl::StatusOr<BanksTilesRegistry> Create(
+      const Part &part, const PackagePins &package_pins);
+
+  // Get tiles from an IO bank name.
+  std::optional<std::vector<std::string>> Tiles(uint32_t bank) const;
+
+  // Get an IO bank from a tile.
+  std::optional<uint32_t> TileBank(const std::string &tile) const;
+
+ private:
+  explicit BanksTilesRegistry(tile_to_bank_type tile_to_bank, banks_to_tiles_type banks_to_tiles)
+      : tile_to_bank_(std::move(tile_to_bank)), banks_to_tiles_(std::move(banks_to_tiles)) {}
+  const tile_to_bank_type tile_to_bank_;
+  const banks_to_tiles_type banks_to_tiles_;
 };
 
-struct Location {
-  uint32_t x;
-  uint32_t y;
+inline constexpr uint32_t kFrameWordCount = 101;
+
+// Frame is made of 101 words of 32-bit size.
+struct Frame {
+  uint32_t address;
+  std::array<uint32_t, kFrameWordCount> words;
 };
 
-using bits_addr_t = uint32_t;
+// Centralize access to all the required information for a specific part.
+class PartDatabase {
+ public:
+  ~PartDatabase();
+  struct TilesDatabase {
+    TileGrid tile_grid;
+    TileTypesSegmentsBits segments_bits;
+  };
+  explicit PartDatabase(std::shared_ptr<TilesDatabase> tiles);
 
-struct BitsBlockAlias {
-  std::map<std::string, std::string> sites;
-  uint32_t start_offset;
-  std::string type;
+  static absl::StatusOr<PartDatabase> Create(
+      absl::string_view database_path, absl::string_view part_name);
+
+  const struct Tile* Tile(absl::string_view tile_name) const;
+  std::vector<Frame> ComputeSegmentBits(absl::string_view tile_name, uint32_t address) const;
+
+ private:
+  class Impl;
+  std::unique_ptr<Impl> impl_;
 };
-
-struct BitsBlock {
-  std::optional<BitsBlockAlias> alias;
-  bits_addr_t base_address;
-  uint32_t frames;
-  uint32_t offset;
-  uint32_t words;
-};
-
-using Bits = std::map<ConfigBusType, BitsBlock>;
-
-struct Tile {
-  // Tile type.
-  // Maybe repeated.
-  std::string type;
-
-  // Grid coordinates.
-  Location coord;
-
-  // Maybe repeated.
-  std::optional<std::string> clock_region;
-
-  // Tile configuration bits.
-  std::optional<Bits> bits;
-
-  std::map<std::string, std::string> pin_functions;
-  std::map<std::string, std::string> sites;
-  std::vector<std::string> prohibited_sites;
-};
-
-// TODO, for now basic std map, we might want to use
-// an unordered map or flat_hash_map from absl.
-// Set of tiles of a specific architecture. Different fpgas might share
-// the different "fabric".
-using TileGrid = std::map<std::string, Tile>;
-
-absl::StatusOr<TileGrid> ParseTileGridJSON(absl::string_view content);
-
-enum class PseudoPIPType {
-  kAlways,
-  kDefault,
-  kHint,
-};
-
-// Pseudo Programmable Interconnect Points.
-using TileTypePseudoPIPs = std::map<std::string, PseudoPIPType>;
-
-// Parse pseudo pips associated to each tile that is part
-// of a tile sub-type.
-absl::StatusOr<TileTypePseudoPIPs> ParsePseudoPIPsDatabase(
-  absl::string_view content);
-
-struct SegmentBit {
-  uint32_t word_column;
-  uint32_t word_bit;
-  bool is_set;
-};
-
-using TileTypeSegmentsBits = std::map<std::string, std::vector<SegmentBit>>;
-
-// Parse the segments bits associated to each tile that is part
-// of a tile sub-type.
-absl::StatusOr<TileTypeSegmentsBits> ParseSegmentsBitsDatabase(
-  absl::string_view content);
-
-struct PackagePin {
-  std::string pin;
-  uint32_t bank;
-  std::string site;
-  std::string tile;
-  std::string pin_function;
-};
-
-using PackagePins = std::vector<PackagePin>;
-
-// Usually found inside:
-// <db-root>/<family>/<part>/package_pins.csv
-// Expects a csv file with the first line containing:
-// pin,bank,site,tile,pin_function.
-absl::StatusOr<PackagePins> ParsePackagePins(absl::string_view content);
-
-using IOBanksIDsToLocation = std::map<uint32_t, std::string>;
-
-// For each column index, associate a number of frames.
-using ConfigColumnsFramesCount = std::vector<uint32_t>;
-
-using ClockRegionRow = std::map<ConfigBusType, ConfigColumnsFramesCount>;
-
-using GlobalClockRegionHalf = std::vector<ClockRegionRow>;
-
-struct GlobalClockRegions {
-  GlobalClockRegionHalf bottom_rows;
-  GlobalClockRegionHalf top_rows;
-};
-
-struct Part {
-  GlobalClockRegions global_clock_regions;
-  uint32_t idcode;
-  IOBanksIDsToLocation iobanks;
-};
-
-absl::StatusOr<Part> ParsePartJSON(absl::string_view content);
-
-struct PartInfo {
-  std::string device;
-  std::string fabric;
-  std::string package;
-  std::string speedgrade;
-};
-
-absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
-    absl::string_view parts_mapper_yaml, absl::string_view devices_mapper_yaml);
 }  // namespace xstream
 #endif  // XSTREAM_DATABASE_H

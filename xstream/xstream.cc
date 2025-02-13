@@ -10,10 +10,10 @@
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
+#include "absl/cleanup/cleanup.h"
 
 #include "xstream/database.h"
 #include "xstream/fasm-parser.h"
-#include "xstream/banks-tiles-registry.h"
 #include "xstream/memory-mapped-file.h"
 
 absl::StatusOr<xstream::BanksTilesRegistry> CreateBanksRegistry(
@@ -74,6 +74,85 @@ absl::StatusOr<std::optional<TileSiteInfo>> FindPUDCBTileSite(
   return std::optional<TileSiteInfo>{};
 }
 
+struct FasmFeature {
+  uint32_t line;
+  std::string name;
+  int start_bit;
+  int width;
+  uint64_t bits;
+};
+
+struct TileGridInfoAndSegbits {
+  std::string tile_type;
+  xstream::Bits bits;
+};
+
+struct FeatureBit {
+  uint32_t word_column;
+  uint32_t word_bit;
+  bool value;
+};
+
+static absl::Status ProcessFasmFeatures(
+    const std::vector<FasmFeature> &features, const xstream::PartDatabase& db) {
+  for (const auto &tile_feature : features) {
+    // Get first segment of feature name. That's the tile name.
+    // The rest is the feature of that specific tile. For instance:
+    //  [tile name   ] [feature          ][e, s] [value                             ]
+    //  CLBLM_R_X33Y38.SLICEM_X0.ALUT.INIT[31:0]=32'b11111111111111110000000000000000
+    std::vector<std::string> tile_feature_segments = absl::StrSplit(tile_feature.name, absl::MaxSplits('.', 1));
+    if (tile_feature_segments.size() != 2) {
+      return absl::InvalidArgumentError(absl::StrFormat("cannot split feature name %s", tile_feature.name));
+    }
+    const std::string tile_type = tile_feature_segments[0];
+    const std::string tile_feature_name = tile_feature_segments[1];
+    const uint64_t bits = tile_feature.bits;
+    // Select only bit addresses with value bit set to 1.
+    for (int addr = 0; addr < tile_feature.width; ++addr) {
+      const unsigned bit_addr = (addr + tile_feature.start_bit);
+      const bool value = bits & (1 << bit_addr);
+      if (value) {
+        const int feature_addr = addr + tile_feature.start_bit;
+        db.ComputeSegmentBits(tile_feature.name, feature_addr);
+      }
+    }
+  }
+  return absl::OkStatus();
+}
+
+static absl::Status AssembleFrames(FILE *input_stream, const xstream::PartDatabase& db) {
+  // For now store everything in here.
+  std::vector<FasmFeature> features;
+  // TODO: add required features.
+  // TODO: add roi.
+
+  // Parse fasm.
+  size_t buf_size = 8192;
+  char *buffer = (char *)malloc(buf_size);
+  absl::Cleanup buffer_freer = [buffer] { free(buffer); };
+
+  ssize_t read_count;
+  while ((read_count = getline(&buffer, &buf_size, input_stream)) > 0) {
+    const std::string_view content(buffer, read_count);
+    const fasm::ParseResult result = fasm::Parse(
+      content, stderr,
+      [&features](uint32_t line, std::string_view feature_name, int start_bit, int
+      width,
+         uint64_t bits) -> bool {
+        features.push_back(FasmFeature{line, std::string(feature_name), start_bit, width, bits});
+        return true;
+      },
+      [](uint32_t, std::string_view, std::string_view name,
+         std::string_view value) {});
+
+    if (result == fasm::ParseResult::kUserAbort ||
+        result == fasm::ParseResult::kError) {
+      return absl::InternalError("internal error");
+    }
+  }
+  return ProcessFasmFeatures(features, db);
+}
+
 ABSL_FLAG(std::optional<std::string>, prjxray_db_path, std::nullopt,
           R"(Path to root folder containing the prjxray database for the FPGA family.
 If not present, it must be provided via PRJXRAY_DB_PATH.)");
@@ -96,43 +175,6 @@ static std::string StatusToErrorMessage(absl::string_view message, const absl::S
   return absl::StrFormat("%s: %s", message, status.message());
 }
 
-static absl::StatusOr<xstream::PartInfo> ParsePartInfo(
-    const std::filesystem::path &prjxray_db_path, const std::string &part) {
-  const auto parts_yaml_content_result =
-      xstream::MemoryMapFile(prjxray_db_path / "mapping" / "parts.yaml");
-  if (!parts_yaml_content_result.ok()) {
-    return parts_yaml_content_result.status();
-  }
-  const auto devices_yaml_content_result =
-      xstream::MemoryMapFile(prjxray_db_path / "mapping" / "devices.yaml");
-  if (!devices_yaml_content_result.ok()) {
-    return devices_yaml_content_result.status();
-  }
-  const absl::StatusOr<std::map<std::string, xstream::PartInfo>> parts_infos_result =
-    xstream::ParsePartsInfos(
-      parts_yaml_content_result.value()->AsStringVew(),
-      devices_yaml_content_result.value()->AsStringVew());
-  if (!parts_infos_result.ok()) {
-    return parts_infos_result.status();
-  }
-  const std::map<std::string, xstream::PartInfo> &parts_infos = parts_infos_result.value();
-  if (!parts_infos.count(part)) {
-    return absl::InvalidArgumentError(absl::StrFormat("invalid or unknown part \"%s\"", part));
-  }
-  return parts_infos.at(part);
-}
-
-static absl::StatusOr<xstream::TileGrid> ParseTileGrid(
-  const std::filesystem::path &prjxray_db_path, const xstream::PartInfo &part_info) {
-  const auto tilegrid_json_content_result =
-      xstream::MemoryMapFile(prjxray_db_path / part_info.fabric / "tilegrid.json");
-  if (!tilegrid_json_content_result.ok()) {
-    return tilegrid_json_content_result.status();
-  }
-  return xstream::ParseTileGridJSON(
-      tilegrid_json_content_result.value()->AsStringVew());
-}
-
 static absl::StatusOr<std::string> GetOptFlagOrFromEnv(
     const absl::Flag<std::optional<std::string>> &flag, absl::string_view env_var) {
   const std::optional<std::string> flag_value = absl::GetFlag(flag);
@@ -147,28 +189,6 @@ static absl::StatusOr<std::string> GetOptFlagOrFromEnv(
     return std::string(value);
   }
   return flag_value.value();
-}
-
-struct FasmFeature {
-  std::string name;
-  int start_bit;
-  int width;
-  uint64_t bits;
-};
-
-static absl::Status AddFasmLine(const uint32_t line, FasmFeature feature) {
-  // Get first segment of feature name. That's the tile name.
-  // The rest is the feature of that specific tile. For instance:
-  //  [tile        ] [feature          ][e, s] [value                             ]
-  //  CLBLM_R_X33Y38.SLICEM_X0.ALUT.INIT[31:0]=32'b11111111111111110000000000000000
-  std::vector<std::string> tile_feature = absl::StrSplit(feature.name, absl::MaxSplits('.', 1));
-  if (tile_feature.size() != 2) {
-    return absl::InvalidArgumentError(absl::StrFormat("cannot split feature name %s", feature.name));
-  }
-  for (int addr = 0; addr < feature.width; ++addr) {
-    
-  }
-  return absl::OkStatus();
 }
 
 int main(int argc, char *argv[]) {
@@ -199,50 +219,29 @@ int main(int argc, char *argv[]) {
     std::cerr << absl::ProgramUsageMessage() << std::endl;
     return EXIT_FAILURE;
   }
-  const absl::StatusOr<xstream::PartInfo> part_info_result = ParsePartInfo(
-      prjxray_db_path, part);
-  if (!part_info_result.ok()) {
-    std::cerr << StatusToErrorMessage("part mapping parsing", part_info_result.status())
+  const auto part_database_result = xstream::PartDatabase::Create(prjxray_db_path.string(), part);
+  if (!part_database_result.ok()) {
+    std::cerr << StatusToErrorMessage("part mapping parsing", part_database_result.status())
               << std::endl;
     return EXIT_FAILURE;
   }
-  const xstream::PartInfo &part_info = part_info_result.value();
-
-  // Parse tilegrid.
-  const absl::StatusOr<xstream::TileGrid> tilegrid_result =
-      ParseTileGrid(prjxray_db_path, part_info);
-  if (!tilegrid_result.ok()) {
-    std::cerr << StatusToErrorMessage("tilegrid parsing", part_info_result.status())
-              << std::endl;
-  }
-
-  // TODO: add required features.
-  // TODO: add roi.
-
   FILE *input_stream = stdin;
+  absl::Cleanup file_closer = [input_stream] {
+    if (input_stream != stdin) {
+      std::fclose(input_stream);
+    }
+  };
   if (args_count == 2) {
     const std::string_view arg(args[1]);
     if (arg != "-") {
       input_stream = std::fopen(args[1], "r");
     }
   }
-
-  size_t buf_size = 8192;
-  char *buffer = (char *)malloc(buf_size);
-  ssize_t read_count;
-  while ((read_count = getline(&buffer, &buf_size, input_stream)) > 0) {
-    const std::string_view content(buffer, read_count);
-    fasm::Parse(
-      content, stderr,
-      [](uint32_t line, std::string_view feature_name, int start_bit, int
-      width,
-         uint64_t bits) -> bool {
-        AddFasmLine(line, FasmFeature{std::string(feature_name), start_bit, width, bits});
-        return false;
-      },
-      [](uint32_t, std::string_view, std::string_view name,
-         std::string_view value) {});
+  const auto assembler_result = AssembleFrames(input_stream, part_database_result.value());
+  if (!assembler_result.ok()) {
+    std::cerr << StatusToErrorMessage("could not assemble frames", assembler_result)
+              << std::endl;
+    return EXIT_FAILURE;
   }
-  free(buffer);
   return EXIT_SUCCESS;
 }

@@ -31,12 +31,12 @@ cc_library(
 )
 
 cc_library(
-    name = "database",
+    name = "database-parsers",
     srcs = [
-        "database.cc",
+        "database-parsers.cc",
     ],
     hdrs = [
-        "database.h",
+        "database-parsers.h",
     ],
     deps = [
         "@abseil-cpp//absl/log:check",
@@ -53,15 +53,15 @@ filegroup(
 )
 
 cc_test(
-    name = "database_test",
+    name = "database-parsers_test",
     srcs = [
-        "database_test.cc",
+        "database-parsers_test.cc",
     ],
     data = [
         "//xstream:testdata",
     ],
     deps = [
-        ":database",
+        ":database-parsers",
         ":memory-mapped-file",
         "@abseil-cpp//absl/strings:string_view",
         "@googletest//:gtest",
@@ -70,30 +70,30 @@ cc_test(
 )
 
 cc_library(
-    name = "banks-tiles-registry",
+    name = "database",
     srcs = [
-        "banks-tiles-registry.cc",
+        "database.cc",
     ],
     hdrs = [
-        "banks-tiles-registry.h",
+        "database.h",
     ],
     deps = [
-        ":database",
+        ":database-parsers",
         ":memory-mapped-file",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings:string_view",
         "@abseil-cpp//absl/strings:strings",
+        "@rapidjson",
     ],
 )
 
 cc_test(
-    name = "banks-tiles-registry_test",
+    name = "database_test",
     srcs = [
-        "banks-tiles-registry_test.cc",
+        "database_test.cc",
     ],
     deps = [
-        ":banks-tiles-registry",
         ":database",
         "@abseil-cpp//absl/strings:string_view",
         "@googletest//:gtest",
@@ -110,7 +110,7 @@ cc_binary(
         ":fasm-parser",
         ":database",
         ":memory-mapped-file",
-        ":banks-tiles-registry",
+        "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/strings:strings",
         "@abseil-cpp//absl/flags:flag",
         "@abseil-cpp//absl/flags:usage",
