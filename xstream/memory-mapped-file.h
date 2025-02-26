@@ -11,7 +11,7 @@ namespace xstream {
 class MemoryBlock {
  public:
   virtual ~MemoryBlock() = default;
-  virtual absl::string_view AsStringVew() const = 0;
+  virtual absl::string_view AsStringView() const = 0;
 
  protected:
   MemoryBlock() = default;
@@ -24,10 +24,10 @@ class MemoryBlock {
 };
 
 absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
-    absl::string_view path);
+  absl::string_view path);
 
 inline absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
-    const std::filesystem::path &path) {
+  const std::filesystem::path &path) {
   return MemoryMapFile(absl::string_view(std::string(path)));
 }
 }  // namespace xstream

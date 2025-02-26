@@ -151,7 +151,7 @@ using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
   for (int8_t d; (d = internal::kDigitToInt[(uint8_t) * it]) < (base); ++it) \
     if (d == internal::kDigitSeparator) {                                    \
     } else                                                                   \
-      v = v * (base) + d
+      (v) = (v) * (base) + d
 
 inline ParseResult Parse(std::string_view content, FILE *errstream,
                          const ParseCallback &parse_callback,

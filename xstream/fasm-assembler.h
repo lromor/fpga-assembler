@@ -4,11 +4,11 @@
 namespace xstream {
 class FasmAssembler {
  public:
-  FasmAssembler() {
-  }
+  FasmAssembler() {}
+
  private:
   std::filesystem::path prjxray_db_root_;
 };
-}
+}  // namespace xstream
 
 #endif  // XSTREAM_FASM_ASSEMBLER_H

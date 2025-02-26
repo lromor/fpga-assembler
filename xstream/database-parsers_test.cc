@@ -5,6 +5,13 @@
 #include "gtest/gtest.h"
 
 namespace xstream {
+
+template <typename Sink>
+void AbslStringify(Sink &sink, const TileFeature &e) {
+  absl::Format(&sink, "(tile_feature=\"%s\", address=%d)", e.tile_feature,
+               e.address);
+}
+
 namespace {
 constexpr absl::string_view kSampleTileGridJSON = R"({
   "TILE_A": {
@@ -79,6 +86,9 @@ TEST(TileGridParser, SampleTileGrid) {
   const Tile &tile_b = tile_grid.at("TILE_B");
   EXPECT_EQ(tile_b.pin_functions.size(), 1);
   EXPECT_EQ(tile_b.bits.value().count(ConfigBusType::kCLBIOCLK), 1);
+  EXPECT_EQ(tile_b.pin_functions.size(), 1);
+  EXPECT_EQ(tile_b.pin_functions.count("IOB_X0Y0"), 1);
+  EXPECT_EQ(tile_b.pin_functions.at("IOB_X0Y0"), "IO_25_14");
 
   const BitsBlock &block = tile_b.bits.value().at(ConfigBusType::kCLBIOCLK);
   EXPECT_TRUE(block.alias.has_value());
@@ -135,8 +145,7 @@ TEST(PseudoPIPsParser, CanParseSimpleDatabases) {
      .expected_success = true},
   };
   for (const auto &test : kTestCases) {
-    const absl::StatusOr<PseudoPIPs> res =
-      ParsePseudoPIPsDatabase(test.db);
+    const absl::StatusOr<PseudoPIPs> res = ParsePseudoPIPsDatabase(test.db);
     if (!test.expected_success) {
       EXPECT_FALSE(res.ok());
     } else {
@@ -166,16 +175,20 @@ struct SegmentBitsParserTestCase {
 TEST(SegmentsBitsParser, CanParseSimpleDatabases) {
   const struct SegmentBitsParserTestCase kTestCases[] = {
     {"FOO 28_519 !29_519",
-     {{"FOO", {{28, 519, true}, {29, 519, false}}}},
+     {{{"FOO", 0}, {{28, 519, true}, {29, 519, false}}}},
      true},
-    {"BAR !1_23", {{"BAR", {{1, 23, false}}}}, true},
+    {"BAR !1_23", {{{"BAR", 0}, {{1, 23, false}}}}, true},
     {"\n BAZ  42_42 33_93\n QUX !0_1 \n  ",
-     {{"BAZ", {{42, 42, true}, {33, 93, true}}}, {"QUX", {{0, 1, false}}}},
+     {{{"BAZ", 0}, {{42, 42, true}, {33, 93, true}}},
+      {{"QUX", 0}, {{0, 1, false}}}},
      true},
+    {"BAR[0] !1_23", {{{"BAR", 0}, {{1, 23, false}}}}, true},
+    {"BAR[1] !1_23", {{{"BAR", 1}, {{1, 23, false}}}}, true},
+    {"BAR[002] !1_23", {{{"BAR", 2}, {{1, 23, false}}}}, true},
+    {"BAR[200] !1_23", {{{"BAR", 200}, {{1, 23, false}}}}, true},
   };
   for (const auto &test : kTestCases) {
-    const absl::StatusOr<SegmentsBits> res =
-      ParseSegmentsBitsDatabase(test.db);
+    const absl::StatusOr<SegmentsBits> res = ParseSegmentsBitsDatabase(test.db);
     if (!test.expected_success) {
       EXPECT_FALSE(res.ok());
     } else {
@@ -184,7 +197,7 @@ TEST(SegmentsBitsParser, CanParseSimpleDatabases) {
       const SegmentsBits &actual = res.value();
       for (const auto &pair : test.expected_segbits) {
         ASSERT_EQ(actual.count(pair.first), 1)
-          << absl::StrFormat("expected key \"%s\" not found", pair.first);
+          << absl::StrFormat("expected key \"%v\" not found", pair.first);
         EXPECT_THAT(actual.at(pair.first),
                     ::testing::Pointwise(SegmentBitEquals(), pair.second));
       }
@@ -401,7 +414,6 @@ TEST(PartParser, SamplePart) {
   EXPECT_EQ(counts[2], 36);
 }
 
-
 constexpr absl::string_view kSamplePartsMapperYAML = R"(
 xc7a100tcsg324-3:
   device: xc7a100t
@@ -429,9 +441,10 @@ constexpr absl::string_view kSampleDevicesMapperYAML = R"(
 // Test some basic expectaions for a sample tilegrid.json
 TEST(PartsInfosParser, SamplePartsAndDevices) {
   absl::StatusOr<std::map<std::string, PartInfo>> parts_infos_result =
-      ParsePartsInfos(kSamplePartsMapperYAML, kSampleDevicesMapperYAML);
+    ParsePartsInfos(kSamplePartsMapperYAML, kSampleDevicesMapperYAML);
   ASSERT_TRUE(parts_infos_result.ok()) << parts_infos_result.status().message();
-  const std::map<std::string, PartInfo> &parts_infos = parts_infos_result.value();
+  const std::map<std::string, PartInfo> &parts_infos =
+    parts_infos_result.value();
   {
     const std::string kPartName = "xc7a100tcsg324-3";
     const PartInfo &info = parts_infos.at(kPartName);

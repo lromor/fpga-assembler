@@ -107,13 +107,13 @@ cc_binary(
         "xstream.cc",
     ],
     deps = [
-        ":fasm-parser",
         ":database",
+        ":fasm-parser",
         ":memory-mapped-file",
         "@abseil-cpp//absl/cleanup:cleanup",
-        "@abseil-cpp//absl/strings:strings",
         "@abseil-cpp//absl/flags:flag",
-        "@abseil-cpp//absl/flags:usage",
         "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/flags:usage",
+        "@abseil-cpp//absl/strings:strings",
     ],
 )

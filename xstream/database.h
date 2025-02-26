@@ -7,7 +7,6 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-
 #include "xstream/database-parsers.h"
 
 namespace xstream {
@@ -23,7 +22,7 @@ class BanksTilesRegistry {
   const_iterator end() const { return banks_to_tiles_.end(); }
 
   static absl::StatusOr<BanksTilesRegistry> Create(
-      const Part &part, const PackagePins &package_pins);
+    const Part &part, const PackagePins &package_pins);
 
   // Get tiles from an IO bank name.
   std::optional<std::vector<std::string>> Tiles(uint32_t bank) const;
@@ -32,39 +31,67 @@ class BanksTilesRegistry {
   std::optional<uint32_t> TileBank(const std::string &tile) const;
 
  private:
-  explicit BanksTilesRegistry(tile_to_bank_type tile_to_bank, banks_to_tiles_type banks_to_tiles)
-      : tile_to_bank_(std::move(tile_to_bank)), banks_to_tiles_(std::move(banks_to_tiles)) {}
+  explicit BanksTilesRegistry(tile_to_bank_type tile_to_bank,
+                              banks_to_tiles_type banks_to_tiles)
+      : tile_to_bank_(std::move(tile_to_bank)),
+        banks_to_tiles_(std::move(banks_to_tiles)) {}
   const tile_to_bank_type tile_to_bank_;
   const banks_to_tiles_type banks_to_tiles_;
 };
 
 inline constexpr uint32_t kFrameWordCount = 101;
+inline constexpr uint32_t kWordSizeBits = 32;
+
+// Define frame configutration word.
+using word_t = uint32_t;
+static_assert(8 * sizeof(word_t) == 32, "expected word size of 32");
 
 // Frame is made of 101 words of 32-bit size.
-struct Frame {
-  uint32_t address;
-  std::array<uint32_t, kFrameWordCount> words;
+// Maps an address to an array of 101 words.
+using Frames = std::map<uint32_t, std::array<word_t, kFrameWordCount>>;
+
+struct SegmentsBitsWithPseudoPIPs {
+  PseudoPIPs pips;
+  std::map<ConfigBusType, SegmentsBits> segment_bits;
 };
+
+// Maps tile types to segbits.
+using TileTypesSegmentsBitsGetter =
+  std::function<std::optional<SegmentsBitsWithPseudoPIPs>(std::string)>;
 
 // Centralize access to all the required information for a specific part.
 class PartDatabase {
  public:
-  ~PartDatabase();
-  struct TilesDatabase {
-    TileGrid tile_grid;
-    TileTypesSegmentsBits segments_bits;
+  ~PartDatabase() = default;
+  struct Tiles {
+    Tiles(TileGrid grid, TileTypesSegmentsBitsGetter bits)
+        : grid(std::move(grid)), bits(std::move(bits)) {}
+    TileGrid grid;
+    TileTypesSegmentsBitsGetter bits;
   };
-  explicit PartDatabase(std::shared_ptr<TilesDatabase> tiles);
+  explicit PartDatabase(std::shared_ptr<Tiles> part_tiles)
+      : tiles_(std::move(part_tiles)) {}
 
-  static absl::StatusOr<PartDatabase> Create(
-      absl::string_view database_path, absl::string_view part_name);
+  static absl::StatusOr<PartDatabase> Parse(absl::string_view database_path,
+                                            absl::string_view part_name);
 
-  const struct Tile* Tile(absl::string_view tile_name) const;
-  std::vector<Frame> ComputeSegmentBits(absl::string_view tile_name, uint32_t address) const;
+  struct FrameBit {
+    uint32_t word;
+    uint32_t index;
+  };
+  using BitSetter = std::function<void(uint32_t address, const FrameBit &bit)>;
+
+  // Set bits to configure a feature in a specific tile.
+  void ConfigBits(const std::string &tile_name, const std::string &feature,
+                  uint32_t address, const BitSetter &bit_setter);
+
+  const struct Tiles &tiles() { return *tiles_; }
 
  private:
-  class Impl;
-  std::unique_ptr<Impl> impl_;
+  bool AddSegbitsToCache(const std::string &tile_type);
+
+  std::shared_ptr<Tiles> tiles_;
+  std::map<std::string, SegmentsBitsWithPseudoPIPs> segment_bits_cache_;
 };
 }  // namespace xstream
 #endif  // XSTREAM_DATABASE_H

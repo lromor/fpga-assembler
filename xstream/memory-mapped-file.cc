@@ -13,7 +13,7 @@ class MemoryMappedFile final : public MemoryBlock {
   MemoryMappedFile(char *const data, const size_t size)
       : data_(data), size_(size) {}
 
-  absl::string_view AsStringVew() const override { return {data_, size_}; }
+  absl::string_view AsStringView() const override { return {data_, size_}; }
 
   ~MemoryMappedFile() override { munmap(data_, size_); }
 

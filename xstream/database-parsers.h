@@ -58,11 +58,32 @@ struct Tile {
   std::vector<std::string> prohibited_sites;
 };
 
-// TODO, for now basic std map, we might want to use
-// an unordered map or flat_hash_map from absl.
 // Set of tiles of a specific architecture. Different fpgas might share
 // the different "fabric".
 // Maps tile names (type.feature) to their metadata.
+// For instance the tilegrid item:
+// ```
+// "CLBLL_L_X16Y149": {
+//     "bits": {
+//         "CLB_IO_CLK": {
+//             "baseaddr": "0x00020800",
+//             "frames": 36,
+//             "offset": 99,
+//             "words": 2
+//         }
+//     },
+//     "clock_region": "X0Y2",
+//     "grid_x": 43,
+//     "grid_y": 1,
+//     "pin_functions": {},
+//     "sites": {
+//         "SLICE_X24Y149": "SLICEL",
+//         "SLICE_X25Y149": "SLICEL"
+//     },
+//     "type": "CLBLL_L"
+// }
+// ```
+// Corresponds to a key (tile name) CLBLL_L_X16Y149 and tile type: CLBLL_L
 using TileGrid = std::map<std::string, Tile>;
 
 enum class PseudoPIPType {
@@ -75,12 +96,30 @@ enum class PseudoPIPType {
 using PseudoPIPs = std::map<std::string, PseudoPIPType>;
 
 struct SegmentBit {
+  // To which word the bit is part of.
   uint32_t word_column;
+
+  // Word index of the bit to enable.
   uint32_t word_bit;
+
+  // If the char '!' is prepended.
   bool is_set;
 };
 
-using SegmentsBits = std::map<std::string, std::vector<SegmentBit>>;
+struct TileFeature {
+  // Expecting a tile type and feature in a single string.
+  std::string tile_feature;
+
+  // If not specified in the db, is 0 by default.
+  uint32_t address;
+};
+
+inline bool operator<(const TileFeature &lhs, const TileFeature &rhs) {
+  return std::tie(lhs.tile_feature, lhs.address) <
+         std::tie(rhs.tile_feature, rhs.address);
+}
+
+using SegmentsBits = std::map<TileFeature, std::vector<SegmentBit>>;
 
 struct PackagePin {
   std::string pin;
@@ -119,27 +158,22 @@ struct PartInfo {
   std::string speedgrade;
 };
 
-struct SegmentsBitsWithPIPs {
-  PseudoPIPs pips;
-  SegmentsBits segment_bits;
-};
-
-// Lazily maps tile types to segbits.
-using TileTypesSegmentsBits = std::map<std::string, std::map<ConfigBusType, SegmentsBitsWithPIPs>>;
-
-// Parse family parts.
+// Parse family part.
+// <db-root>/<family>/<part>/part.json.
 absl::StatusOr<Part> ParsePartJSON(absl::string_view content);
 
-// Usually found inside:
+// Parses file found at:
 // <db-root>/<family>/<part>/package_pins.csv
-// Expects a csv file with the first line containing:
-// pin,bank,site,tile,pin_function.
+// Expects a csv file containing:
+// ```
+// pin,bank,site,tile,pin_function
+// A2,216,OPAD_X0Y2,GTP_CHANNEL_1_X97Y121,MGTPTXN1_216
+// ```
 absl::StatusOr<PackagePins> ParsePackagePins(absl::string_view content);
 
 // Parse pseudo pips associated to each tile that is part
 // of a tile sub-type.
-absl::StatusOr<PseudoPIPs> ParsePseudoPIPsDatabase(
-  absl::string_view content);
+absl::StatusOr<PseudoPIPs> ParsePseudoPIPsDatabase(absl::string_view content);
 
 // Parse the segments bits associated to each tile that is part
 // of a tile sub-type.
