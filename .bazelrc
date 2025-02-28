@@ -2,7 +2,7 @@
 build --workspace_status_command="scripts/create-workspace-status.sh"
 
 # C++, with warnings mostly turned to 11.
-build       --cxxopt=-std=c++17            --host_cxxopt=-std=c++17
+build       --cxxopt=-std=c++20            --host_cxxopt=-std=c++20
 build       --cxxopt=-xc++                 --host_cxxopt=-xc++
 build       --cxxopt=-Wall                 --host_cxxopt=-Wall
 build       --cxxopt=-Wextra               --host_cxxopt=-Wextra
@@ -21,7 +21,7 @@ build --host_per_file_copt=external/.*@-w
 build --enable_platform_specific_config
 build:macos --macos_minimum_os=10.15
 build:macos --features=-supports_dynamic_linker
-build:macos --cxxopt=-std=c++17            --host_cxxopt=-std=c++17
+build:macos --cxxopt=-std=c++20            --host_cxxopt=-std=c++20
 
 # Print out test log on failure.
 test --test_output=errors
