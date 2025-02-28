@@ -14,8 +14,13 @@
 
 #include "xstream/fasm-parser.h"
 
+#include <cstdint>
+#include <cstdio>
 #include <iostream>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 using fasm::ParseResult;
 
@@ -198,7 +203,7 @@ void AnnotationParseTest() {
     // Value with backslash-escaped quote
     {"{ .escaped = \"Some quote with \\\"quote\\\"\" }\n",
      ParseResult::kSuccess,
-     {{".escaped", "Some quote with \\\"quote\\\""}}},
+     {{".escaped", R"(Some quote with \"quote\")"}}},
 
     // Error: String quote missing around value
     {"{ foo = \"bar\", baz = quux\" }\n",
