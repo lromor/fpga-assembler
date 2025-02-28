@@ -13,6 +13,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# clang-tidy runner artifacts
+run-clang-tidy-cached
+xstream_clang-tidy.*
+
 # Ignore backup files.
 *~
 
