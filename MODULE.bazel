@@ -27,13 +27,5 @@ git_override(
     remote = "https://github.com/f4pga/prjxray.git",
 )
 
-# Repo to generate compilation database.
-bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
-git_override(
-    module_name = "hedron_compile_commands",
-    commit = "4f28899228fb3ad0126897876f147ca15026151e",
-    patch_strip = 1,
-    # https://github.com/hedronvision/bazel-compile-commands-extractor/issues/199
-    patches = ["//bazel:bazel-compile-commands-extractor-fix.patch"],
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
-)
+# compilation DB; build_cleaner
+bazel_dep(name = "bant", version = "0.1.14", dev_dependency = True)

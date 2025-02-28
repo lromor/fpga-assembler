@@ -8,7 +8,7 @@ MODULE.bazel.lock
 .env.production.local
 .direnv
 .envrc
-compile_commands.json
+compile_flags.txt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
