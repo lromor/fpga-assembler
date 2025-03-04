@@ -16,8 +16,14 @@ pkgs.mkShell {
     # For clang-tidy and clang-format.
     clangTools
 
-    # For buildifier, buildozer
+    # For buildifier, buildozer.
     bazel-buildtools
+
+    # Profiling and sanitizers.
+    linuxPackages_latest.perf
+    pprof
+    perf_data_converter
+    valgrind
   ];
 
   # Expose as env variables the path to clang tools.

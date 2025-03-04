@@ -3,6 +3,7 @@
 #include <unordered_set>
 
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
 namespace xstream {
 namespace {
@@ -17,12 +18,13 @@ struct CorrectMappingAndTileNamesTestCase {
 // prepended by "HCLK_IOI3_" to make the final tile name.
 TEST(BanksTilesRegistry, CorrectMappingAndTileNames) {
   const struct CorrectMappingAndTileNamesTestCase kTestCases[] = {
-    {{{}, {}, IOBanksIDsToLocation{{0, "X1Y78"}, {3, "X2Y43"}}},
+    {{{}, {}, IOBanksIDsToLocation{{0, "X1Y78"}, {3, "X2Y43"}, {4, "X1Y78"}}},
      {{{}, 0, {}, "LIOB33_X0Y93", {}},
       {{}, 216, {}, "GTP_CHANNEL_1_X97Y121", {}},
       {{}, 0, {}, "HCLK_IOI3_X1Y79", {}}},
      {{{0, {"HCLK_IOI3_X1Y78", "LIOB33_X0Y93", "HCLK_IOI3_X1Y79"}},
        {3, {"HCLK_IOI3_X2Y43"}},
+       {4, {"HCLK_IOI3_X1Y78"}},
        {216, {"GTP_CHANNEL_1_X97Y121"}}}}},
   };
 
@@ -50,9 +52,9 @@ TEST(BanksTilesRegistry, CorrectMappingAndTileNames) {
 
       // Check all the tiles can be mapped back to the bank.
       for (const auto &tile : tiles_vector) {
-        const std::optional<uint32_t> maybe_bank = registry.TileBank(tile);
-        ASSERT_TRUE(maybe_bank.has_value());
-        EXPECT_EQ(maybe_bank.value(), pair.first);
+        const std::vector<uint32_t> banks = registry.TileBanks(tile);
+        ASSERT_TRUE(banks.size() > 0);
+        EXPECT_THAT(banks, ::testing::Contains(pair.first));
       }
     }
   }

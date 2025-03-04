@@ -95,7 +95,6 @@ cc_test(
     ],
     deps = [
         ":database",
-        "@abseil-cpp//absl/strings:string_view",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -108,12 +107,14 @@ cc_binary(
     ],
     deps = [
         ":database",
+        ":database-parsers",
         ":fasm-parser",
         ":memory-mapped-file",
         "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/flags:flag",
         "@abseil-cpp//absl/flags:parse",
         "@abseil-cpp//absl/flags:usage",
+        "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/strings:strings",
     ],
 )

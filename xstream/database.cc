@@ -8,31 +8,32 @@
 #include <unordered_set>
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/str_join.h"
+#include "absl/log/check.h"
 #include "xstream/database-parsers.h"
 #include "xstream/memory-mapped-file.h"
 
 namespace xstream {
 absl::StatusOr<BanksTilesRegistry> BanksTilesRegistry::Create(
   const Part &part, const PackagePins &package_pins) {
-  std::map<std::string, uint32_t> tile_to_bank;
+  std::map<std::string, std::vector<uint32_t>> tile_to_banks;
   std::map<uint32_t, std::unordered_set<std::string>> banks_to_tiles_set;
-
   for (const auto &pair : part.iobanks) {
     const std::string tile = "HCLK_IOI3_" + pair.second;
     banks_to_tiles_set[pair.first].insert(tile);
-    if (tile_to_bank.count(tile) > 0) {
-      return absl::InvalidArgumentError("tile mapped to multiple banks");
+    if (!tile_to_banks.contains(tile)) {
+      tile_to_banks.insert({tile, {}});
     }
-    tile_to_bank.insert({tile, pair.first});
+    tile_to_banks.at(tile).push_back(pair.first);
   }
 
   for (const auto &pin : package_pins) {
     banks_to_tiles_set[pin.bank].insert(pin.tile);
-    if (tile_to_bank.count(pin.tile) > 0) {
-      return absl::InvalidArgumentError("tile mapped to multiple banks");
+    if (!tile_to_banks.contains(pin.tile)) {
+      tile_to_banks.insert({pin.tile, {}});
     }
-    tile_to_bank.insert({pin.tile, pin.bank});
+    tile_to_banks.at(pin.tile).push_back(pin.bank);
   }
   // Convert sets to vectors.
   banks_to_tiles_type banks_to_tiles;
@@ -41,20 +42,20 @@ absl::StatusOr<BanksTilesRegistry> BanksTilesRegistry::Create(
       {pair.first,
        std::vector<std::string>(pair.second.begin(), pair.second.end())});
   }
-  return BanksTilesRegistry(tile_to_bank, banks_to_tiles);
+  return BanksTilesRegistry(tile_to_banks, banks_to_tiles);
 }
 
 std::optional<std::vector<std::string>> BanksTilesRegistry::Tiles(
   uint32_t bank) const {
-  if (banks_to_tiles_.count(bank) == 0) {
+  if (!banks_to_tiles_.contains(bank)) {
     return {};
   }
   return banks_to_tiles_.at(bank);
 }
 
-std::optional<uint32_t> BanksTilesRegistry::TileBank(
+std::vector<uint32_t> BanksTilesRegistry::TileBanks(
   const std::string &tile) const {
-  if (tile_to_bank_.count(tile) == 0) {
+  if (!tile_to_bank_.contains(tile)) {
     return {};
   }
   return tile_to_bank_.at(tile);
@@ -62,7 +63,7 @@ std::optional<uint32_t> BanksTilesRegistry::TileBank(
 
 bool PartDatabase::AddSegbitsToCache(const std::string &tile_type) {
   // Already have the tile type segbits.
-  if (segment_bits_cache_.count(tile_type)) {
+  if (segment_bits_cache_.contains(tile_type)) {
     return false;
   }
   const std::optional<SegmentsBitsWithPseudoPIPs> maybe_segbits =
@@ -95,7 +96,7 @@ static absl::StatusOr<PartInfo> ParsePartInfo(
   }
   const std::map<std::string, PartInfo> &parts_infos =
     parts_infos_result.value();
-  if (!parts_infos.count(part)) {
+  if (!parts_infos.contains(part)) {
     return absl::InvalidArgumentError(
       absl::StrFormat("invalid or unknown part \"%s\"", part));
   }
@@ -262,6 +263,33 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
   return out;
 }
 
+absl::StatusOr<xstream::BanksTilesRegistry> CreateBanksRegistry(
+    const std::filesystem::path &part_json_path,
+    const std::filesystem::path &package_pins_path) {
+  // Parse part.json.
+  const absl::StatusOr<std::unique_ptr<xstream::MemoryBlock>> part_json_result =
+      xstream::MemoryMapFile(part_json_path);
+  if (!part_json_result.ok()) return part_json_result.status();
+  const absl::StatusOr<xstream::Part> part_result =
+      xstream::ParsePartJSON(part_json_result.value()->AsStringView());
+  if (!part_result.ok()) {
+    return part_result.status();
+  }
+  const xstream::Part &part = part_result.value();
+
+  // Parse package pins.
+  const absl::StatusOr<std::unique_ptr<xstream::MemoryBlock>> package_pins_csv_result =
+      xstream::MemoryMapFile(package_pins_path);
+  if (!package_pins_csv_result.ok()) return package_pins_csv_result.status();
+  const absl::StatusOr<xstream::PackagePins> package_pins_result =
+      xstream::ParsePackagePins(package_pins_csv_result.value()->AsStringView());
+  if (!package_pins_result.ok()) {
+    return package_pins_result.status();
+  }
+  const xstream::PackagePins &package_pins = package_pins_result.value();
+  return xstream::BanksTilesRegistry::Create(part, package_pins);
+}
+
 absl::StatusOr<PartDatabase> PartDatabase::Parse(
   absl::string_view database_path, absl::string_view part_name) {
   const absl::StatusOr<PartInfo> part_info_result =
@@ -288,7 +316,7 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(
   auto tiles_database = [paths = std::move(tiles_types_databases_paths)](
                           const std::string &tile_type)
     -> std::optional<SegmentsBitsWithPseudoPIPs> {
-    if (paths.count(tile_type)) {
+    if (paths.contains(tile_type)) {
       absl::StatusOr<SegmentsBitsWithPseudoPIPs> tile_type_database_result =
         ParseTileTypeDatabase(paths.at(tile_type));
       if (!tile_type_database_result.ok()) {
@@ -299,8 +327,15 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(
     }
     return {};
   };
+  auto banks_tiles_registry_result = CreateBanksRegistry(
+      std::filesystem::path(database_path) / part_name / "part.json",
+      std::filesystem::path(database_path) / part_name / "package_pins.csv");
+  if (!banks_tiles_registry_result.ok()) {
+    return banks_tiles_registry_result.status();
+  }
   Tiles tiles_foo(std::move(tilegrid_result.value()),
-                  std::move(tiles_database));
+                  std::move(tiles_database),
+                  std::move(banks_tiles_registry_result.value()));
   std::shared_ptr<Tiles> tiles = std::make_shared<Tiles>(tiles_foo);
   return absl::StatusOr<PartDatabase>(tiles);
 }
@@ -311,65 +346,90 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
                               const BitSetter &bit_setter) {
   // Given the tilename, get the tile type.
   const Tile &tile = tiles_->grid.at(tile_name);
+  // Either the feature tile type of the tile type alias.
+  std::string tile_type = tile.type;
+  std::string aliased_feature = feature;
+
+  // Materialize aliased bit maps.
+  std::map<ConfigBusType, BitsBlock> aliased_bits_map;
+  for (const auto &pair : tile.bits.value_or(Bits{})) {
+    const BitsBlock &bits_block = pair.second;
+    const ConfigBusType &bus_type = pair.first;
+    if (bits_block.alias.has_value()) {
+      const BitsBlockAlias alias = bits_block.alias.value();
+      // TODO: check that for each block the aliased tile type is the same.
+      tile_type = bits_block.alias.value().type;
+      std::vector<std::string> feature_parts = absl::StrSplit(feature, absl::MaxSplits('.', 1));
+      if (feature_parts.size() >= 2) {
+        std::string &site = feature_parts[1];
+        if (alias.sites.contains(site)) {
+          site = alias.sites.at(site);
+        }
+        aliased_feature = absl::StrJoin(feature_parts, ".");
+      }
+      const BitsBlock aliased_block = {
+        .alias = {},
+        .base_address = bits_block.base_address,
+        .frames = bits_block.frames,
+        .offset = bits_block.offset - alias.start_offset,
+        .words = bits_block.words,
+      };
+      aliased_bits_map.insert({bus_type, aliased_block});
+    } else {
+      aliased_bits_map.insert({bus_type, bits_block});
+    }
+  }
+
   const std::optional<SegmentsBitsWithPseudoPIPs> maybe_segment_bits =
-    tiles_->bits(tile.type);
+    tiles_->bits(tile_type);
   if (!maybe_segment_bits.has_value()) return;
   const SegmentsBitsWithPseudoPIPs &segment_bits = maybe_segment_bits.value();
   const std::string tile_segments_bits_key =
-    absl::StrJoin({tile_name, feature}, ".");
-  if (segment_bits.pips.count(tile_segments_bits_key)) {
+    absl::StrJoin({tile_name, aliased_feature}, ".");
+  if (segment_bits.pips.contains(tile_segments_bits_key)) {
     return;
   }
-  // Check if it has an alias. If it does, exit as we don't support it yet.
-  const std::map<ConfigBusType, BitsBlock> &bits = tile.bits.value_or(Bits{});
-  for (const auto &pair : bits) {
-    if (pair.second.alias.has_value()) {
-      std::cerr
-        << "oh no, found a tile with an alias, we don't support that yet."
-        << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  }
-  // Search our database of features and get the segbit.
-  struct TileFeature tile_feature = {
-    .tile_feature = absl::StrJoin({tile.type, feature}, "."),
-    .address = address,
-  };
 
   // Fill the cache with the current tile type segbits.
-  AddSegbitsToCache(tile.type);
-  if (!segment_bits_cache_.count(tile.type)) {
+  AddSegbitsToCache(tile_type);
+  if (!segment_bits_cache_.contains(tile_type)) {
     return;
   }
   const SegmentsBitsWithPseudoPIPs &tile_type_features_bits =
-    segment_bits_cache_.at(tile.type);
+      segment_bits_cache_.at(tile_type);
+
+  // Search our database of features and get the segbit.
+  struct TileFeature tile_feature = {
+    .tile_feature = absl::StrJoin({tile_type, aliased_feature}, "."),
+    .address = address,
+  };
+
   // If it's a pseudo pip, skip.
   // TODO(lromor): Is this really necessary? It looks like all pips are
   // different.
-  if (tile_type_features_bits.pips.count(tile_feature.tile_feature)) {
+  if (tile_type_features_bits.pips.contains(tile_feature.tile_feature)) {
     return;
   }
+
   // The tile name has some specific config bus base addresses.
-  for (const auto &config_bus_bits_pair : bits) {
+  for (const auto &config_bus_bits_pair : aliased_bits_map) {
     const ConfigBusType &bus = config_bus_bits_pair.first;
     const uint32_t base_address = config_bus_bits_pair.second.base_address;
     const uint32_t offset = config_bus_bits_pair.second.offset;
-    if (!tile_type_features_bits.segment_bits.count(bus)) {
+    if (!tile_type_features_bits.segment_bits.contains(bus)) {
       continue;
     }
     const SegmentsBits &features_segbits =
       tile_type_features_bits.segment_bits.at(bus);
     const auto &segbits = features_segbits.at(tile_feature);
     for (const auto &segbit : segbits) {
-      if (segbit.is_set) {
-        const uint32_t address = base_address + segbit.word_column;
-        const uint32_t bit_pos = offset * kWordSizeBits + segbit.word_bit;
-        const FrameBit frame_bit = {
-          .word = bit_pos / kWordSizeBits,
-          .index = bit_pos % kWordSizeBits,
-        };
-        bit_setter(address, frame_bit);
-      }
+      const uint32_t address = base_address + segbit.word_column;
+      const uint32_t bit_pos = offset * kWordSizeBits + segbit.word_bit;
+      const FrameBit frame_bit = {
+        .word = bit_pos / kWordSizeBits,
+        .index = bit_pos % kWordSizeBits,
+      };
+      bit_setter(bus, address, frame_bit, segbit.is_set);
     }
   }
 }

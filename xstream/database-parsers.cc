@@ -425,7 +425,7 @@ absl::Status ParsePseudoPIPTypeFromString(const std::string &value,
     {"default", PseudoPIPType::kDefault},
     {"hint", PseudoPIPType::kHint},
   };
-  if (pseudo_pip_type_string.count(value) > 0) {
+  if (pseudo_pip_type_string.contains(value)) {
     *type = pseudo_pip_type_string.at(value);
     return absl::OkStatus();
   }
@@ -771,7 +771,7 @@ absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
       absl::string_view part,
       const std::map<std::string, std::string> &props) -> absl::Status {
       constexpr const char *kFabricProperty = "fabric";
-      if (props.count(kFabricProperty) == 0) {
+      if (!props.contains(kFabricProperty)) {
         return absl::InvalidArgumentError("parts yaml doesn't contain fabric");
       }
       const std::string &fabric = props.at(kFabricProperty);
@@ -799,7 +799,7 @@ absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
       if (!status.ok()) return status;
 
       // Get the fabric.
-      if (!fabrics.count(info.device)) {
+      if (!fabrics.contains(info.device)) {
         return absl::InvalidArgumentError(absl::StrFormat(
           "could not find fabric for device: \"%s\"", info.device));
       }
