@@ -1,10 +1,10 @@
-#include "xstream/database-parsers.h"
+#include "fpga/database-parsers.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace xstream {
+namespace fpga {
 
 template <typename Sink>
 void AbslStringify(Sink &sink, const TileFeature &e) {
@@ -471,4 +471,4 @@ TEST(PartsInfosParser, SamplePartsAndDevices) {
   }
 }
 }  // namespace
-}  // namespace xstream
+}  // namespace fpga

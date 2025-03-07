@@ -1,4 +1,4 @@
-#include "xstream/database.h"
+#include "fpga/database.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -11,10 +11,10 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/str_join.h"
 #include "absl/log/check.h"
-#include "xstream/database-parsers.h"
-#include "xstream/memory-mapped-file.h"
+#include "fpga/database-parsers.h"
+#include "fpga/memory-mapped-file.h"
 
-namespace xstream {
+namespace fpga {
 absl::StatusOr<BanksTilesRegistry> BanksTilesRegistry::Create(
   const Part &part, const PackagePins &package_pins) {
   std::map<std::string, std::vector<uint32_t>> tile_to_banks;
@@ -78,17 +78,17 @@ bool PartDatabase::AddSegbitsToCache(const std::string &tile_type) {
 static absl::StatusOr<PartInfo> ParsePartInfo(
   const std::filesystem::path &prjxray_db_path, const std::string &part) {
   const auto parts_yaml_content_result =
-    xstream::MemoryMapFile(prjxray_db_path / "mapping" / "parts.yaml");
+    fpga::MemoryMapFile(prjxray_db_path / "mapping" / "parts.yaml");
   if (!parts_yaml_content_result.ok()) {
     return parts_yaml_content_result.status();
   }
   const auto devices_yaml_content_result =
-    xstream::MemoryMapFile(prjxray_db_path / "mapping" / "devices.yaml");
+    fpga::MemoryMapFile(prjxray_db_path / "mapping" / "devices.yaml");
   if (!devices_yaml_content_result.ok()) {
     return devices_yaml_content_result.status();
   }
   const absl::StatusOr<std::map<std::string, PartInfo>> parts_infos_result =
-    xstream::ParsePartsInfos(
+    fpga::ParsePartsInfos(
       parts_yaml_content_result.value()->AsStringView(),
       devices_yaml_content_result.value()->AsStringView());
   if (!parts_infos_result.ok()) {
@@ -105,13 +105,13 @@ static absl::StatusOr<PartInfo> ParsePartInfo(
 
 static absl::StatusOr<TileGrid> ParseTileGrid(
   const std::filesystem::path &prjxray_db_path,
-  const xstream::PartInfo &part_info) {
+  const fpga::PartInfo &part_info) {
   const auto tilegrid_json_content_result =
     MemoryMapFile(prjxray_db_path / part_info.fabric / "tilegrid.json");
   if (!tilegrid_json_content_result.ok()) {
     return tilegrid_json_content_result.status();
   }
-  return xstream::ParseTileGridJSON(
+  return fpga::ParseTileGridJSON(
     tilegrid_json_content_result.value()->AsStringView());
 }
 
@@ -235,7 +235,7 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
   SegmentsBitsWithPseudoPIPs out;
   // Parse pseudo pips db.
   if (paths.ppips_db.has_value()) {
-    const auto content = xstream::MemoryMapFile(paths.ppips_db.value());
+    const auto content = fpga::MemoryMapFile(paths.ppips_db.value());
     if (!content.ok()) return content.status();
     auto ppips_db = ParsePseudoPIPsDatabase(content.value()->AsStringView());
     if (!ppips_db.ok()) return ppips_db.status();
@@ -244,7 +244,7 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
   std::map<ConfigBusType, SegmentsBits> &segment_bits = out.segment_bits;
   // Parse segments bits.
   if (paths.segbits_db.has_value()) {
-    const auto content = xstream::MemoryMapFile(paths.segbits_db.value());
+    const auto content = fpga::MemoryMapFile(paths.segbits_db.value());
     if (!content.ok()) return content.status();
     auto segbits_db =
       ParseSegmentsBitsDatabase(content.value()->AsStringView());
@@ -253,7 +253,7 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
   }
   if (paths.segbits_block_ram_db.has_value()) {
     const auto content =
-      xstream::MemoryMapFile(paths.segbits_block_ram_db.value());
+      fpga::MemoryMapFile(paths.segbits_block_ram_db.value());
     if (!content.ok()) return content.status();
     auto segbits_db =
       ParseSegmentsBitsDatabase(content.value()->AsStringView());
@@ -263,31 +263,31 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
   return out;
 }
 
-absl::StatusOr<xstream::BanksTilesRegistry> CreateBanksRegistry(
+absl::StatusOr<fpga::BanksTilesRegistry> CreateBanksRegistry(
     const std::filesystem::path &part_json_path,
     const std::filesystem::path &package_pins_path) {
   // Parse part.json.
-  const absl::StatusOr<std::unique_ptr<xstream::MemoryBlock>> part_json_result =
-      xstream::MemoryMapFile(part_json_path);
+  const absl::StatusOr<std::unique_ptr<fpga::MemoryBlock>> part_json_result =
+      fpga::MemoryMapFile(part_json_path);
   if (!part_json_result.ok()) return part_json_result.status();
-  const absl::StatusOr<xstream::Part> part_result =
-      xstream::ParsePartJSON(part_json_result.value()->AsStringView());
+  const absl::StatusOr<fpga::Part> part_result =
+      fpga::ParsePartJSON(part_json_result.value()->AsStringView());
   if (!part_result.ok()) {
     return part_result.status();
   }
-  const xstream::Part &part = part_result.value();
+  const fpga::Part &part = part_result.value();
 
   // Parse package pins.
-  const absl::StatusOr<std::unique_ptr<xstream::MemoryBlock>> package_pins_csv_result =
-      xstream::MemoryMapFile(package_pins_path);
+  const absl::StatusOr<std::unique_ptr<fpga::MemoryBlock>> package_pins_csv_result =
+      fpga::MemoryMapFile(package_pins_path);
   if (!package_pins_csv_result.ok()) return package_pins_csv_result.status();
-  const absl::StatusOr<xstream::PackagePins> package_pins_result =
-      xstream::ParsePackagePins(package_pins_csv_result.value()->AsStringView());
+  const absl::StatusOr<fpga::PackagePins> package_pins_result =
+      fpga::ParsePackagePins(package_pins_csv_result.value()->AsStringView());
   if (!package_pins_result.ok()) {
     return package_pins_result.status();
   }
-  const xstream::PackagePins &package_pins = package_pins_result.value();
-  return xstream::BanksTilesRegistry::Create(part, package_pins);
+  const fpga::PackagePins &package_pins = package_pins_result.value();
+  return fpga::BanksTilesRegistry::Create(part, package_pins);
 }
 
 absl::StatusOr<PartDatabase> PartDatabase::Parse(
@@ -300,7 +300,7 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(
   const PartInfo &part_info = part_info_result.value();
 
   // Parse tilegrid.
-  absl::StatusOr<xstream::TileGrid> tilegrid_result =
+  absl::StatusOr<fpga::TileGrid> tilegrid_result =
     ParseTileGrid(database_path, part_info);
   if (!tilegrid_result.ok()) {
     return tilegrid_result.status();
@@ -433,4 +433,4 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
     }
   }
 }
-}  // namespace xstream
+}  // namespace fpga

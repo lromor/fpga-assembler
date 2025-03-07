@@ -1,5 +1,5 @@
 module(
-    name = "xstream",
+    name = "fpga-assembler",
     version = "0.0.1",
 )
 

@@ -58,7 +58,7 @@ cc_test(
         "database-parsers_test.cc",
     ],
     data = [
-        "//xstream:testdata",
+        "//fpga:testdata",
     ],
     deps = [
         ":database-parsers",
@@ -101,9 +101,9 @@ cc_test(
 )
 
 cc_binary(
-    name = "xstream",
+    name = "assembler",
     srcs = [
-        "xstream.cc",
+        "assembler.cc",
     ],
     deps = [
         ":database",

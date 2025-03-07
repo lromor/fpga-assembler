@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "xstream/fasm-parser.h"
+#include "fpga/fasm-parser.h"
 
 #include <cstdint>
 #include <cstdio>

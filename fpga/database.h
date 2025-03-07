@@ -1,5 +1,5 @@
-#ifndef XSTREAM_DATABASE_H
-#define XSTREAM_DATABASE_H
+#ifndef FPGA_DATABASE_H
+#define FPGA_DATABASE_H
 
 #include <cstdint>
 #include <memory>
@@ -8,9 +8,9 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "xstream/database-parsers.h"
+#include "fpga/database-parsers.h"
 
-namespace xstream {
+namespace fpga {
 // Many to many map between banks and tiles.
 class BanksTilesRegistry {
   using tile_to_bank_type = std::map<std::string, std::vector<uint32_t>>;
@@ -94,5 +94,5 @@ class PartDatabase {
   std::shared_ptr<Tiles> tiles_;
   std::map<std::string, SegmentsBitsWithPseudoPIPs> segment_bits_cache_;
 };
-}  // namespace xstream
-#endif  // XSTREAM_DATABASE_H
+}  // namespace fpga
+#endif  // FPGA_DATABASE_H

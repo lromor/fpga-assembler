@@ -1,11 +1,11 @@
-#include "xstream/database.h"
+#include "fpga/database.h"
 
 #include <unordered_set>
 
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-namespace xstream {
+namespace fpga {
 namespace {
 struct CorrectMappingAndTileNamesTestCase {
   Part part;
@@ -60,4 +60,4 @@ TEST(BanksTilesRegistry, CorrectMappingAndTileNames) {
   }
 }
 }  // namespace
-}  // namespace xstream
+}  // namespace fpga

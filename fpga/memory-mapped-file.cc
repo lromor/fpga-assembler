@@ -1,4 +1,4 @@
-#include "xstream/memory-mapped-file.h"
+#include "fpga/memory-mapped-file.h"
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -6,7 +6,7 @@
 
 #include "absl/status/status.h"
 
-namespace xstream {
+namespace fpga {
 namespace {
 class MemoryMappedFile final : public MemoryBlock {
  public:
@@ -39,4 +39,4 @@ absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
   close(fd);
   return std::make_unique<MemoryMappedFile>((char *)buffer, file_size);
 }
-}  // namespace xstream
+}  // namespace fpga

@@ -1,5 +1,5 @@
-#ifndef XSTREAM_DATABASE_PARSERS_H
-#define XSTREAM_DATABASE_PARSERS_H
+#ifndef FPGA_DATABASE_PARSERS_H
+#define FPGA_DATABASE_PARSERS_H
 
 #include <cstdint>
 #include <map>
@@ -9,7 +9,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
-namespace xstream {
+namespace fpga {
 enum class ConfigBusType {
   kCLBIOCLK,
   kBlockRam,
@@ -184,5 +184,5 @@ absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
   absl::string_view parts_mapper_yaml, absl::string_view devices_mapper_yaml);
 
 absl::StatusOr<TileGrid> ParseTileGridJSON(absl::string_view content);
-}  // namespace xstream
-#endif  // XSTREAM_DATABASE_PARSERS_H
+}  // namespace fpga
+#endif  // FPGA_DATABASE_PARSERS_H

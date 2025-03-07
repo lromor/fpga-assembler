@@ -22,9 +22,9 @@
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 
-#include "xstream/database-parsers.h"
-#include "xstream/database.h"
-#include "xstream/fasm-parser.h"
+#include "fpga/database-parsers.h"
+#include "fpga/database.h"
+#include "fpga/fasm-parser.h"
 
 struct TileSiteInfo {
   std::string tile;
@@ -32,10 +32,10 @@ struct TileSiteInfo {
 };
 
 bool FindPUDCBTileSite(
-    const xstream::TileGrid &tilegrid, TileSiteInfo &info) {
+    const fpga::TileGrid &tilegrid, TileSiteInfo &info) {
   for (const auto &p : tilegrid) {
     const std::string &tile = p.first;
-    const xstream::Tile &tileinfo = p.second;
+    const fpga::Tile &tileinfo = p.second;
     int y_coord;
     for (const auto &functions_kv : tileinfo.pin_functions) {
       const std::string &site = functions_kv.first;
@@ -58,9 +58,9 @@ bool FindPUDCBTileSite(
   return false;
 }
 
-std::vector<std::string> GetIOBSites(const xstream::TileGrid &grid, const std::string &tile_name) {
+std::vector<std::string> GetIOBSites(const fpga::TileGrid &grid, const std::string &tile_name) {
   std::vector<std::string> out;
-  const xstream::Tile &tile = grid.at(tile_name);
+  const fpga::Tile &tile = grid.at(tile_name);
   uint32_t site_y;
   for (const auto &site_pair : tile.sites) {
     const absl::string_view site_name = site_pair.first;
@@ -81,11 +81,11 @@ struct FasmFeature {
 
 struct TileGridInfoAndSegbits {
   std::string tile_type;
-  xstream::Bits bits;
+  fpga::Bits bits;
 };
 
 static absl::Status ProcessFasmFeatures(
-    const std::vector<FasmFeature> &features, xstream::PartDatabase& db, xstream::Frames &frames) {
+    const std::vector<FasmFeature> &features, fpga::PartDatabase& db, fpga::Frames &frames) {
   for (const auto &tile_feature : features) {
     // Get first segment of feature name. That's the tile name.
     // The rest is the feature of that specific tile. For instance:
@@ -98,7 +98,7 @@ static absl::Status ProcessFasmFeatures(
     const std::string tile_name = tile_feature_segments[0];
     const std::string feature = tile_feature_segments[1];
     const uint64_t bits = tile_feature.bits;
-    std::unordered_set<xstream::ConfigBusType> used_config_buses;
+    std::unordered_set<fpga::ConfigBusType> used_config_buses;
     // Select only bit addresses with value bit set to 1.
     for (int addr = 0; addr < tile_feature.width; ++addr) {
       const unsigned bit_addr = (addr + tile_feature.start_bit);
@@ -108,8 +108,8 @@ static absl::Status ProcessFasmFeatures(
         db.ConfigBits(
             tile_name, feature, feature_addr,
             [&frames, &used_config_buses](
-                xstream::ConfigBusType bus, uint32_t address,
-                const xstream::PartDatabase::FrameBit &bit,
+                fpga::ConfigBusType bus, uint32_t address,
+                const fpga::PartDatabase::FrameBit &bit,
                 bool value) {
               // Update the list of tile segbits buses used.
               // So we can use it later on to mark all the frames that have been used.
@@ -120,7 +120,7 @@ static absl::Status ProcessFasmFeatures(
                 frames.insert({address, {}});
               }
               if (value) {
-                std::array<xstream::word_t, xstream::kFrameWordCount> &frame = frames[address];
+                std::array<fpga::word_t, fpga::kFrameWordCount> &frame = frames[address];
                 frame[bit.word] |= (1 << bit.index);
               }
         });
@@ -130,11 +130,11 @@ static absl::Status ProcessFasmFeatures(
       continue;
     }
     // Get tilegrid info.
-    const xstream::Tile &tile_info = db.tiles().grid.at(tile_name);
+    const fpga::Tile &tile_info = db.tiles().grid.at(tile_name);
     CHECK(tile_info.bits.has_value());
     const auto &config_bits = tile_info.bits.value();
     for (const auto &bus : used_config_buses) {
-      const xstream::BitsBlock &info = config_bits.at(bus);
+      const fpga::BitsBlock &info = config_bits.at(bus);
       for (unsigned i = 0; i < info.frames; ++i) {
         frames.insert({info.base_address + i, {}});
       }
@@ -150,7 +150,7 @@ constexpr absl::string_view kPUDCBPullUpFASMLinesTemplate[] = {
   "%s.%s.PULLTYPE.PULLUP",
 };
 
-bool AddPUDCBFeatures(const xstream::TileGrid &tilegrid, std::vector<FasmFeature> &features) {
+bool AddPUDCBFeatures(const fpga::TileGrid &tilegrid, std::vector<FasmFeature> &features) {
   TileSiteInfo info;
   if (!FindPUDCBTileSite(tilegrid, info)) {
     return false;
@@ -173,8 +173,8 @@ bool AddPUDCBFeatures(const xstream::TileGrid &tilegrid, std::vector<FasmFeature
 }
 
 static void AddStepDownFeatures(
-    const xstream::BanksTilesRegistry &banks,
-    const xstream::TileGrid &grid, std::vector<FasmFeature> &features) {
+    const fpga::BanksTilesRegistry &banks,
+    const fpga::TileGrid &grid, std::vector<FasmFeature> &features) {
   // Stores a set of strings <tile-type>.<site>
   std::unordered_set<std::string> used_iob_sites;
   std::map<uint32_t, std::unordered_set<std::string>> stepdown_banks_tags;
@@ -246,7 +246,7 @@ static void AddStepDownFeatures(
   }
 }
 
-static absl::Status AssembleFrames(FILE *input_stream, xstream::PartDatabase& db, xstream::Frames &frames) {
+static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase& db, fpga::Frames &frames) {
   // For now store everything in here.
   std::vector<FasmFeature> features;
   // TODO: add required features.
@@ -294,7 +294,7 @@ static inline std::string Usage(absl::string_view name) {
   return absl::StrCat("usage: ", name,
                       " [options] < input.fasm > output.frm\n"
                       R"(
-xstream parses a sequence of fasm lines and assembles them
+fpga parses a sequence of fasm lines and assembles them
 into a set of frames to be mapped into bitstream.
 Output is written to stdout.
 )");
@@ -321,7 +321,7 @@ static absl::StatusOr<std::string> GetOptFlagOrFromEnv(
 }
 
 static void GetPrettyFrameLine(const uint32_t address,
-                               const std::array<xstream::word_t, xstream::kFrameWordCount> &bits,
+                               const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
                                std::ostream &out) {
   out << absl::StrFormat("Frame @ 0x%08X\n", address);
   for (size_t i = 0; i < bits.size(); ++i) {
@@ -334,7 +334,7 @@ static void GetPrettyFrameLine(const uint32_t address,
 }
 
 static void GetFrameLine(const uint32_t address,
-                         const std::array<xstream::word_t, xstream::kFrameWordCount> &bits,
+                         const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
                          std::ostream &out) {
   out << absl::StrFormat("0x%08X ", address);
   std::vector<std::string> words;
@@ -346,10 +346,10 @@ static void GetFrameLine(const uint32_t address,
   out << "\n";
 }
 
-static void PrintFrames(const xstream::Frames &frames, std::ostream &out, bool pretty) {
+static void PrintFrames(const fpga::Frames &frames, std::ostream &out, bool pretty) {
   for (const auto &frame : frames) {
     const uint32_t &address = frame.first;
-    const std::array<xstream::word_t, xstream::kFrameWordCount> &bits = frame.second;
+    const std::array<fpga::word_t, fpga::kFrameWordCount> &bits = frame.second;
     if (pretty) {
       GetPrettyFrameLine(address, bits, out);
     } else {
@@ -386,7 +386,7 @@ int main(int argc, char *argv[]) {
     std::cerr << absl::ProgramUsageMessage() << std::endl;
     return EXIT_FAILURE;
   }
-  auto part_database_result = xstream::PartDatabase::Parse(prjxray_db_path.string(), part);
+  auto part_database_result = fpga::PartDatabase::Parse(prjxray_db_path.string(), part);
   if (!part_database_result.ok()) {
     std::cerr << StatusToErrorMessage("part mapping parsing", part_database_result.status())
               << std::endl;
@@ -404,7 +404,7 @@ int main(int argc, char *argv[]) {
       input_stream = std::fopen(args[1], "r");
     }
   }
-  xstream::Frames frames;
+  fpga::Frames frames;
   const auto assembler_result = AssembleFrames(
       input_stream, part_database_result.value(), frames);
   if (!assembler_result.ok()) {
