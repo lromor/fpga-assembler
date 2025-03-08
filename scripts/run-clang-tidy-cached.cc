@@ -120,15 +120,15 @@ struct ConfigValues {
 
 // --------------[ Project-specific configuration ]--------------
 static constexpr ConfigValues kConfig = {
-    .start_dir = "xstream/",
-    .is_bazel_project = true,
-    .revisit_brokenfiles_if_build_config_newer = false,  // not clean yet
+  .start_dir = "fpga/",
+  .is_bazel_project = true,
+  .revisit_brokenfiles_if_build_config_newer = false,  // not clean yet
 };
 // --------------------------------------------------------------
 
 // More clang-tidy config.
 static constexpr std::string_view kExtraArgs[] = {
-    "-Wno-unknown-pragmas", "-Wno-unknown-warning-option"};
+  "-Wno-unknown-pragmas", "-Wno-unknown-warning-option"};
 
 // All the extensions we consider
 inline bool IsOneOf(std::string_view s,
@@ -231,9 +231,9 @@ class ContentAddressedStore {
     // If file exists but is broken (i.e. has a non-zero size with messages),
     // consider recreating if if older than compilation db.
     const bool timestamp_trigger =
-        kConfig.revisit_brokenfiles_if_build_config_newer &&
-        (fs::file_size(content_hash_file) > 0 &&
-         fs::last_write_time(content_hash_file) < min_freshness);
+      kConfig.revisit_brokenfiles_if_build_config_newer &&
+      (fs::file_size(content_hash_file) > 0 &&
+       fs::last_write_time(content_hash_file) < min_freshness);
     return timestamp_trigger;
   }
 
@@ -260,8 +260,8 @@ class ClangTidyRunner {
     }
     const char *jobs_env_str = getenv("CLANG_TIDY_JOBS");
     const int jobs_env_num = jobs_env_str ? atoi(jobs_env_str) : -1;
-    const int kJobs = (jobs_env_num > 0 ? jobs_env_num
-                                        : std::thread::hardware_concurrency());
+    const int kJobs =
+      (jobs_env_num > 0 ? jobs_env_num : std::thread::hardware_concurrency());
     std::cerr << work_queue->size() << " files to process (w/ " << kJobs
               << " jobs)...";
 
@@ -337,9 +337,7 @@ class ClangTidyRunner {
 
   static std::string AssembleArgs(int argc, char **argv) {
     std::string result = " --quiet";
-    result.append(" '--config-file=")
-      .append(GetClangTidyConfig())
-        .append("'");
+    result.append(" '--config-file=").append(GetClangTidyConfig()).append("'");
     for (const std::string_view arg : kExtraArgs) {
       result.append(" --extra-arg='").append(arg).append("'");
     }
@@ -360,10 +358,9 @@ class ClangTidyRunner {
     }
     std::smatch version_match;
     const std::string major_version =
-        std::regex_search(version, version_match,
-                          std::regex{"version ([0-9]+)"})
-            ? version_match[1].str()
-            : "UNKNOWN";
+      std::regex_search(version, version_match, std::regex{"version ([0-9]+)"})
+        ? version_match[1].str()
+        : "UNKNOWN";
 
     // Make sure directory filename depends on .clang-tidy content.
     hash_t cache_unique_id = hashContent(version + clang_tidy_args_);
@@ -379,8 +376,8 @@ class ClangTidyRunner {
                                const std::string &in, std::ostream &out) {
     // Extract basename of lines that have a clang-tidy check at end.
     static const std::regex file_with_tidy(
-        ".*(?:^|/)([^/]+):[0-9]+:[0-9]+:.*"
-        "\\[[a-zA-Z.]+-[a-zA-Z.-]+\\]$");
+      ".*(?:^|/)([^/]+):[0-9]+:[0-9]+:.*"
+      "\\[[a-zA-Z.]+-[a-zA-Z.-]+\\]$");
 
     // Simple 'awk' - go through each line and output depending on state.
     bool do_print_line = true;
@@ -416,7 +413,7 @@ class ClangTidyRunner {
       }
       canonicalize_expr += fs::current_path().string() + "/";  // $(pwd)/
       canonicalize_expr +=
-          ")?(\\./)?";  // Some start with, or have a trailing ./
+        ")?(\\./)?";  // Some start with, or have a trailing ./
       return std::regex{canonicalize_expr};
     }();
 
@@ -478,7 +475,7 @@ class FileGatherer {
     // If we want to revisit if headers changed, make hash dependent on them.
     std::list<filepath_contenthash_t> work_queue;
     const std::regex inc_re(
-        R"""(#\s*include\s+"([0-9a-zA-Z_/-]+\.[a-zA-Z]+)")""");
+      R"""(#\s*include\s+"([0-9a-zA-Z_/-]+\.[a-zA-Z]+)")""");
     for (filepath_contenthash_t &work_file : files_of_interest_) {
       const auto content = GetContent(work_file.first);
       work_file.second = hashContent(content);
@@ -582,7 +579,7 @@ int main(int argc, char *argv[]) {
 
   std::error_code ec;
   const auto toplevel_build_ts =
-      fs::last_write_time(kConfig.toplevel_build_file, ec);
+    fs::last_write_time(kConfig.toplevel_build_file, ec);
   if (ec.value() != 0) {
     std::cerr << "Script needs to be executed in toplevel project dir.\n";
     return EXIT_FAILURE;
@@ -619,7 +616,7 @@ int main(int argc, char *argv[]) {
   const std::string detailed_report = cache_prefix + "clang-tidy.out";
   const std::string summary = cache_prefix + "clang-tidy.summary";
   const size_t tidy_count = cc_file_gatherer.CreateReport(
-      runner.project_cache_dir(), detailed_report, summary);
+    runner.project_cache_dir(), detailed_report, summary);
 
   return tidy_count == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
