@@ -24,10 +24,10 @@ class MemoryBlock {
 };
 
 absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
-    std::string_view path);
+  std::string_view path);
 
 inline absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
-    const std::filesystem::path &path) {
+  const std::filesystem::path &path) {
   return MemoryMapFile(std::string_view(std::string(path)));
 }
 }  // namespace fpga

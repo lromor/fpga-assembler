@@ -1,17 +1,29 @@
 #include "fpga/database-parsers.h"
 
 #include <algorithm>
+#include <cerrno>
+#include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <iterator>
 #include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
+#include "absl/base/optimization.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
+#include "absl/status/status.h"
 #include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "rapidjson/document.h"
+#include "rapidjson/rapidjson.h"
 #undef RAPIDJSON_HAS_STDSTRING
 
 #include "rapidjson/error/en.h"
@@ -69,10 +81,10 @@ const char *JSONTypeString(const rapidjson::Type &type) {
   }
 }
 
-static const absl::flat_hash_map<std::string, ConfigBusType> StringToConfigBusType = {
-  {"BLOCK_RAM", ConfigBusType::kBlockRam},
-  {"CLB_IO_CLK", ConfigBusType::kCLBIOCLK},
-  {"CFG_CLB", ConfigBusType::kCFGCLB}};
+static const absl::flat_hash_map<std::string, ConfigBusType>
+  StringToConfigBusType = {{"BLOCK_RAM", ConfigBusType::kBlockRam},
+                           {"CLB_IO_CLK", ConfigBusType::kCLBIOCLK},
+                           {"CFG_CLB", ConfigBusType::kCFGCLB}};
 
 std::string ValueAsString(const rapidjson::Value &json) {
   rapidjson::StringBuffer sb;
@@ -138,7 +150,6 @@ inline absl::StatusOr<std::vector<std::string>> Unmarshal(
   const rapidjson::Value &json) {
   OK_OR_RETURN(IsArray(json));
   std::vector<std::string> array;
-  std::string value;
   for (const auto &item : json.GetArray()) {
     if (!item.IsString()) {
       return UnexpectedTypeError(item);
@@ -153,7 +164,7 @@ inline absl::StatusOr<bits_addr_t> ParseBaseAddress(
   if (!value.ok()) return value.status();
   errno = 0;
   char *end;
-  bits_addr_t address = std::strtol(value.value().c_str(), &end, 0);
+  const bits_addr_t address = std::strtol(value.value().c_str(), &end, 0);
   const bool range_error = errno == ERANGE;
   if (range_error) {
     return absl::InvalidArgumentError(
@@ -165,8 +176,9 @@ inline absl::StatusOr<bits_addr_t> ParseBaseAddress(
 template <>
 inline absl::StatusOr<BitsBlockAlias> Unmarshal(const rapidjson::Value &json) {
   BitsBlockAlias value;
-  ASSIGN_OR_RETURN(value.sites, (GetMember<absl::flat_hash_map<std::string, std::string>>(
-                                  json, "sites")));
+  ASSIGN_OR_RETURN(
+    value.sites,
+    (GetMember<absl::flat_hash_map<std::string, std::string>>(json, "sites")));
   ASSIGN_OR_RETURN(value.start_offset,
                    GetMember<uint32_t>(json, "start_offset"));
   ASSIGN_OR_RETURN(value.type, GetMember<std::string>(json, "type"));
@@ -215,11 +227,12 @@ absl::StatusOr<Tile> Unmarshal(const rapidjson::Value &json) {
                    OptGetMember<std::string>(json, "clock_region"));
   ASSIGN_OR_RETURN(tile.bits, GetMember<Bits>(json, "bits"));
 
+  ASSIGN_OR_RETURN(tile.pin_functions,
+                   (GetMember<absl::flat_hash_map<std::string, std::string>>(
+                     json, "pin_functions")));
   ASSIGN_OR_RETURN(
-    tile.pin_functions,
-    (GetMember<absl::flat_hash_map<std::string, std::string>>(json, "pin_functions")));
-  ASSIGN_OR_RETURN(
-      tile.sites, (GetMember<absl::flat_hash_map<std::string, std::string>>(json, "sites")));
+    tile.sites,
+    (GetMember<absl::flat_hash_map<std::string, std::string>>(json, "sites")));
   ASSIGN_OR_RETURN(tile.prohibited_sites, (GetMember<std::vector<std::string>>(
                                             json, "prohibited_sites")));
   return tile;
@@ -339,8 +352,9 @@ absl::StatusOr<Part> Unmarshal(const rapidjson::Value &json) {
   struct Part part;
   OK_OR_RETURN(IsObject(json));
   ASSIGN_OR_RETURN(part.idcode, GetMember<uint32_t>(json, "idcode"));
-  ASSIGN_OR_RETURN(part.iobanks, (GetMember<absl::flat_hash_map<uint32_t, std::string>>(
-                                   json, "iobanks")));
+  ASSIGN_OR_RETURN(
+    part.iobanks,
+    (GetMember<absl::flat_hash_map<uint32_t, std::string>>(json, "iobanks")));
   ASSIGN_OR_RETURN(part.global_clock_regions, (GetMember<GlobalClockRegions>(
                                                 json, "global_clock_regions")));
   return part;
@@ -354,7 +368,7 @@ absl::StatusOr<Part> Unmarshal(const rapidjson::Value &json) {
 
 absl::StatusOr<TileGrid> ParseTileGridJSON(const std::string_view content) {
   rapidjson::Document json;
-  rapidjson::ParseResult ok = json.Parse(content.data(), content.size());
+  const rapidjson::ParseResult ok = json.Parse(content.data(), content.size());
   if (!ok) {
     return absl::InvalidArgumentError(
       absl::StrFormat("json parsing error, %s (%u)",
@@ -385,8 +399,7 @@ namespace {
 #define skip_to_eol() \
   while (*it != '\n' && unlikely(it < end)) ++it
 
-using LinesSink =
-  std::function<absl::Status(uint32_t, const std::string_view)>;
+using LinesSink = std::function<absl::Status(uint32_t, const std::string_view)>;
 
 // Given a sequence of characters, calls sink for every subsequence
 // delimited by new lines except for the first and the last.
@@ -420,11 +433,12 @@ absl::Status MakeInvalidLineStatus(const uint32_t line_number,
 
 absl::Status ParsePseudoPIPTypeFromString(const std::string &value,
                                           PseudoPIPType *type) {
-  static const absl::flat_hash_map<std::string, PseudoPIPType> pseudo_pip_type_string = {
-    {"always", PseudoPIPType::kAlways},
-    {"default", PseudoPIPType::kDefault},
-    {"hint", PseudoPIPType::kHint},
-  };
+  static const absl::flat_hash_map<std::string, PseudoPIPType>
+    pseudo_pip_type_string = {
+      {"always", PseudoPIPType::kAlways},
+      {"default", PseudoPIPType::kDefault},
+      {"hint", PseudoPIPType::kHint},
+    };
   if (pseudo_pip_type_string.contains(value)) {
     *type = pseudo_pip_type_string.at(value);
     return absl::OkStatus();
@@ -625,7 +639,7 @@ absl::StatusOr<PackagePins> ParsePackagePins(std::string_view content) {
 
 absl::StatusOr<Part> ParsePartJSON(const std::string_view content) {
   rapidjson::Document json;
-  rapidjson::ParseResult ok = json.Parse(content.data(), content.size());
+  const rapidjson::ParseResult ok = json.Parse(content.data(), content.size());
   if (!ok) {
     return absl::InvalidArgumentError(
       absl::StrFormat("json parsing error, %s (%u)",
@@ -674,11 +688,11 @@ std::string_view RemoveSurroundingQuotes(std::string_view s) {
 // must end with a colon.
 absl::Status ParseMappingYAML(const std::string_view content,
                               const KeyPropsSink &sink) {
-  std::vector<std::string_view> lines = absl::StrSplit(content, '\n');
+  const std::vector<std::string_view> lines = absl::StrSplit(content, '\n');
   std::string current_key;
   absl::flat_hash_map<std::string, std::string> properties;
 
-  for (std::string_view line : lines) {
+  for (const std::string_view line : lines) {
     // Remove surrounding whitespace.
     std::string_view trimmed = absl::StripAsciiWhitespace(line);
 
@@ -688,7 +702,8 @@ absl::Status ParseMappingYAML(const std::string_view content,
     }
 
     // Compute the indentation level (number of leading spaces).
-    int indent = line.size() - absl::StripLeadingAsciiWhitespace(line).size();
+    const int indent =
+      line.size() - absl::StripLeadingAsciiWhitespace(line).size();
 
     if (indent == 0) {
       // Flush any previous mapping entry.
@@ -711,13 +726,13 @@ absl::Status ParseMappingYAML(const std::string_view content,
       properties.clear();  // Reset properties for the new entry.
     } else {
       // Nested line: expect a key-value pair separated by a colon.
-      size_t colon_pos = trimmed.find(':');
+      const size_t colon_pos = trimmed.find(':');
       if (colon_pos == std::string_view::npos) {
         return absl::InvalidArgumentError(
           "Nested key-value pair missing colon");
       }
 
-      std::string_view key =
+      const std::string_view key =
         absl::StripAsciiWhitespace(trimmed.substr(0, colon_pos));
       std::string_view value =
         absl::StripAsciiWhitespace(trimmed.substr(colon_pos + 1));
@@ -751,7 +766,8 @@ struct MapperDevices {
 };
 
 template <typename K, typename V>
-absl::Status ValueOrStatus(absl::flat_hash_map<K, V> map, const K &key, V &value) {
+absl::Status ValueOrStatus(absl::flat_hash_map<K, V> map, const K &key,
+                           V &value) {
   if (map.count(key) == 0) {
     return absl::InvalidArgumentError(
       absl::StrFormat("key \"%s\" not found", std::string(key)));
@@ -767,9 +783,9 @@ absl::StatusOr<absl::flat_hash_map<std::string, PartInfo>> ParsePartsInfos(
   absl::flat_hash_map<std::string, std::string> fabrics;
   absl::Status status = ParseMappingYAML(
     devices_mapper_yaml,
-    [&fabrics](
-      std::string_view part,
-      const absl::flat_hash_map<std::string, std::string> &props) -> absl::Status {
+    [&fabrics](std::string_view part,
+               const absl::flat_hash_map<std::string, std::string> &props)
+      -> absl::Status {
       constexpr const char *kFabricProperty = "fabric";
       if (!props.contains(kFabricProperty)) {
         return absl::InvalidArgumentError("parts yaml doesn't contain fabric");
@@ -785,7 +801,8 @@ absl::StatusOr<absl::flat_hash_map<std::string, PartInfo>> ParsePartsInfos(
     parts_mapper_yaml,
     [&fabrics, &parts_infos](
       std::string_view part,
-      const absl::flat_hash_map<std::string, std::string> &props) -> absl::Status {
+      const absl::flat_hash_map<std::string, std::string> &props)
+      -> absl::Status {
       absl::Status status;
       PartInfo info;
       status =

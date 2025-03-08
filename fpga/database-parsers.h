@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "absl/status/statusor.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 
 namespace fpga {
 enum class ConfigBusType {
@@ -96,10 +96,10 @@ struct TileFeature {
   uint32_t address;
 
   template <typename H>
-  friend H AbslHashValue(H h, const TileFeature& c) {
+  friend H AbslHashValue(H h, const TileFeature &c) {
     return H::combine(std::move(h), c.tile_feature, c.address);
   }
-  auto operator<=>(const TileFeature& o) const = default;
+  auto operator<=>(const TileFeature &o) const = default;
 };
 
 using SegmentsBits = absl::flat_hash_map<TileFeature, std::vector<SegmentBit>>;
@@ -119,7 +119,8 @@ using IOBanksIDsToLocation = absl::flat_hash_map<uint32_t, std::string>;
 // For each column index, associate a number of frames.
 using ConfigColumnsFramesCount = std::vector<uint32_t>;
 
-using ClockRegionRow = absl::flat_hash_map<ConfigBusType, ConfigColumnsFramesCount>;
+using ClockRegionRow =
+  absl::flat_hash_map<ConfigBusType, ConfigColumnsFramesCount>;
 
 using GlobalClockRegionHalf = std::vector<ClockRegionRow>;
 

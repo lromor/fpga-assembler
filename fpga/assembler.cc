@@ -1,28 +1,30 @@
+#include <sys/types.h>
+
 #include <array>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <cstdint>
-#include <iostream>
 #include <filesystem>
+#include <iostream>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "absl/strings/str_cat.h"
-#include "absl/strings/numbers.h"
-#include "absl/strings/match.h"
-#include "absl/strings/str_format.h"
-#include "absl/strings/str_split.h"
-#include "absl/strings/str_join.h"
+#include "absl/cleanup/cleanup.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
-#include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
-#include "absl/container/flat_hash_set.h"
-#include "absl/container/flat_hash_map.h"
-
-
+#include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "fpga/database-parsers.h"
 #include "fpga/database.h"
 #include "fpga/fasm-parser.h"
@@ -32,8 +34,7 @@ struct TileSiteInfo {
   std::string site;
 };
 
-bool FindPUDCBTileSite(
-    const fpga::TileGrid &tilegrid, TileSiteInfo &info) {
+bool FindPUDCBTileSite(const fpga::TileGrid &tilegrid, TileSiteInfo &info) {
   for (const auto &p : tilegrid) {
     const std::string &tile = p.first;
     const fpga::Tile &tileinfo = p.second;
@@ -59,15 +60,17 @@ bool FindPUDCBTileSite(
   return false;
 }
 
-std::vector<std::string> GetIOBSites(const fpga::TileGrid &grid, const std::string &tile_name) {
+std::vector<std::string> GetIOBSites(const fpga::TileGrid &grid,
+                                     const std::string &tile_name) {
   std::vector<std::string> out;
   const fpga::Tile &tile = grid.at(tile_name);
   uint32_t site_y;
   for (const auto &site_pair : tile.sites) {
     const std::string_view site_name = site_pair.first;
-    const std::string site_y_value = std::to_string(site_name[site_name.size() - 1]);
+    const std::string site_y_value =
+      std::to_string(site_name[site_name.size() - 1]);
     CHECK(absl::SimpleAtoi(site_y_value, &site_y));
-    out.push_back(absl::StrFormat("IOB_Y%d", site_y %2));
+    out.push_back(absl::StrFormat("IOB_Y%d", site_y % 2));
   }
   return out;
 }
@@ -86,15 +89,18 @@ struct TileGridInfoAndSegbits {
 };
 
 static absl::Status ProcessFasmFeatures(
-    const std::vector<FasmFeature> &features, fpga::PartDatabase& db, fpga::Frames &frames) {
+  const std::vector<FasmFeature> &features, fpga::PartDatabase &db,
+  fpga::Frames &frames) {
   for (const auto &tile_feature : features) {
     // Get first segment of feature name. That's the tile name.
     // The rest is the feature of that specific tile. For instance:
-    //  [tile name   ] [feature          ][e, s] [value                             ]
+    //  [tile name   ] [feature          ][e, s] [value ]
     //  CLBLM_R_X33Y38.SLICEM_X0.ALUT.INIT[31:0]=32'b11111111111111110000000000000000
-    std::vector<std::string> tile_feature_segments = absl::StrSplit(tile_feature.name, absl::MaxSplits('.', 1));
+    std::vector<std::string> tile_feature_segments =
+      absl::StrSplit(tile_feature.name, absl::MaxSplits('.', 1));
     if (tile_feature_segments.size() != 2) {
-      return absl::InvalidArgumentError(absl::StrFormat("cannot split feature name %s", tile_feature.name));
+      return absl::InvalidArgumentError(
+        absl::StrFormat("cannot split feature name %s", tile_feature.name));
     }
     const std::string tile_name = tile_feature_segments[0];
     const std::string feature = tile_feature_segments[1];
@@ -107,24 +113,25 @@ static absl::Status ProcessFasmFeatures(
       if (value) {
         const int feature_addr = addr + tile_feature.start_bit;
         db.ConfigBits(
-            tile_name, feature, feature_addr,
-            [&frames, &used_config_buses](
-                fpga::ConfigBusType bus, uint32_t address,
-                const fpga::PartDatabase::FrameBit &bit,
-                bool value) {
-              // Update the list of tile segbits buses used.
-              // So we can use it later on to mark all the frames that have been used.
-              used_config_buses.insert(bus);
+          tile_name, feature, feature_addr,
+          [&frames, &used_config_buses](
+            fpga::ConfigBusType bus, uint32_t address,
+            const fpga::PartDatabase::FrameBit &bit, bool value) {
+            // Update the list of tile segbits buses used.
+            // So we can use it later on to mark all the frames that have been
+            // used.
+            used_config_buses.insert(bus);
 
-              // Insert the frames at address and enable the right bit.
-              if (!frames.contains(address)) {
-                frames.insert({address, {}});
-              }
-              if (value) {
-                std::array<fpga::word_t, fpga::kFrameWordCount> &frame = frames[address];
-                frame[bit.word] |= (1 << bit.index);
-              }
-        });
+            // Insert the frames at address and enable the right bit.
+            if (!frames.contains(address)) {
+              frames.insert({address, {}});
+            }
+            if (value) {
+              std::array<fpga::word_t, fpga::kFrameWordCount> &frame =
+                frames[address];
+              frame[bit.word] |= (1 << bit.index);
+            }
+          });
       }
     }
     if (used_config_buses.empty()) {
@@ -144,12 +151,14 @@ static absl::Status ProcessFasmFeatures(
 
 // Template that for each line should substitute a tile type and a site.
 constexpr std::string_view kPUDCBPullUpFASMLinesTemplate[] = {
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_SSTL15_TMDS_33.IN_ONLY",
+  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_"
+  "SSTL15_TMDS_33.IN_ONLY",
   "%s.%s.LVCMOS25_LVCMOS33_LVTTL.IN",
   "%s.%s.PULLTYPE.PULLUP",
 };
 
-bool AddPUDCBFeatures(const fpga::TileGrid &tilegrid, std::vector<FasmFeature> &features) {
+bool AddPUDCBFeatures(const fpga::TileGrid &tilegrid,
+                      std::vector<FasmFeature> &features) {
   TileSiteInfo info;
   if (!FindPUDCBTileSite(tilegrid, info)) {
     return false;
@@ -162,27 +171,31 @@ bool AddPUDCBFeatures(const fpga::TileGrid &tilegrid, std::vector<FasmFeature> &
     .bits = 1,
   };
   // Unroll loop.
-  feature.name = absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[0], info.tile, info.site);
+  feature.name =
+    absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[0], info.tile, info.site);
   features.push_back(feature);
-  feature.name = absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[1], info.tile, info.site);
+  feature.name =
+    absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[1], info.tile, info.site);
   features.push_back(feature);
-  feature.name = absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[2], info.tile, info.site);
+  feature.name =
+    absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[2], info.tile, info.site);
   features.push_back(feature);
   return true;
 }
 
-static void AddStepDownFeatures(
-    const fpga::BanksTilesRegistry &banks,
-    const fpga::TileGrid &grid, std::vector<FasmFeature> &features) {
+static void AddStepDownFeatures(const fpga::BanksTilesRegistry &banks,
+                                const fpga::TileGrid &grid,
+                                std::vector<FasmFeature> &features) {
   // Stores a set of strings <tile-type>.<site>
   absl::flat_hash_set<std::string> used_iob_sites;
-  absl::flat_hash_map<uint32_t, absl::flat_hash_set<std::string>> stepdown_banks_tags;
+  absl::flat_hash_map<uint32_t, absl::flat_hash_set<std::string>>
+    stepdown_banks_tags;
   for (const auto &feature : features) {
     if (feature.bits == 0) {
       continue;
     }
     std::vector<std::string> tile_feature_segments =
-        absl::StrSplit(feature.name, absl::MaxSplits('.', 3));
+      absl::StrSplit(feature.name, absl::MaxSplits('.', 3));
     if (tile_feature_segments.size() < 3) {
       continue;
     }
@@ -207,8 +220,7 @@ static void AddStepDownFeatures(
 
   for (const auto &bank_tags_pair : stepdown_banks_tags) {
     const uint32_t &bank = bank_tags_pair.first;
-    const absl::flat_hash_set<std::string> &tags =
-        bank_tags_pair.second;
+    const absl::flat_hash_set<std::string> &tags = bank_tags_pair.second;
     const auto maybe_tiles = banks.Tiles(bank);
     CHECK(maybe_tiles.has_value());
     for (const auto &tile : maybe_tiles.value()) {
@@ -245,7 +257,8 @@ static void AddStepDownFeatures(
   }
 }
 
-static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase& db, fpga::Frames &frames) {
+static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase &db,
+                                   fpga::Frames &frames) {
   // For now store everything in here.
   std::vector<FasmFeature> features;
   // TODO: add required features.
@@ -257,16 +270,16 @@ static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase& db, f
   // Parse fasm.
   size_t buf_size = 8192;
   char *buffer = (char *)malloc(buf_size);
-  absl::Cleanup buffer_freer = [buffer] { free(buffer); };
+  const absl::Cleanup buffer_freer = [buffer] { free(buffer); };
   ssize_t read_count;
   while ((read_count = getline(&buffer, &buf_size, input_stream)) > 0) {
     const std::string_view content(buffer, read_count);
     const fasm::ParseResult result = fasm::Parse(
       content, stderr,
-      [&features](uint32_t line, std::string_view feature_name, int start_bit, int
-      width,
-         uint64_t bits) -> bool {
-        features.push_back(FasmFeature{line, std::string(feature_name), start_bit, width, bits});
+      [&features](uint32_t line, std::string_view feature_name, int start_bit,
+                  int width, uint64_t bits) -> bool {
+        features.push_back(
+          FasmFeature{line, std::string(feature_name), start_bit, width, bits});
         return true;
       },
       [](uint32_t, std::string_view, std::string_view name,
@@ -281,13 +294,12 @@ static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase& db, f
   return ProcessFasmFeatures(features, db, frames);
 }
 
-ABSL_FLAG(std::optional<std::string>, prjxray_db_path, std::nullopt,
-          R"(Path to root folder containing the prjxray database for the FPGA family.
+ABSL_FLAG(
+  std::optional<std::string>, prjxray_db_path, std::nullopt,
+  R"(Path to root folder containing the prjxray database for the FPGA family.
 If not present, it must be provided via PRJXRAY_DB_PATH.)");
 
-ABSL_FLAG(
-    std::string, part, "",
-    R"(FPGA part name, e.g. "xc7a35tcsg324-1".)");
+ABSL_FLAG(std::string, part, "", R"(FPGA part name, e.g. "xc7a35tcsg324-1".)");
 
 static inline std::string Usage(std::string_view name) {
   return absl::StrCat("usage: ", name,
@@ -299,29 +311,32 @@ Output is written to stdout.
 )");
 }
 
-static std::string StatusToErrorMessage(std::string_view message, const absl::Status &status) {
+static std::string StatusToErrorMessage(std::string_view message,
+                                        const absl::Status &status) {
   return absl::StrFormat("%s: %s", message, status.message());
 }
 
 static absl::StatusOr<std::string> GetOptFlagOrFromEnv(
-    const absl::Flag<std::optional<std::string>> &flag, std::string_view env_var) {
+  const absl::Flag<std::optional<std::string>> &flag,
+  std::string_view env_var) {
   const std::optional<std::string> flag_value = absl::GetFlag(flag);
   if (!flag_value.has_value()) {
     const char *value = getenv(std::string(env_var).c_str());
     if (value == nullptr) {
       return absl::InvalidArgumentError(
-          absl::StrFormat(
-              "flag \"%s\" not provided either via commandline or environment variable (%s)",
-              flag.Name(), env_var));
+        absl::StrFormat("flag \"%s\" not provided either via commandline or "
+                        "environment variable (%s)",
+                        flag.Name(), env_var));
     }
     return std::string(value);
   }
   return flag_value.value();
 }
 
-static void GetPrettyFrameLine(const uint32_t address,
-                               const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
-                               std::ostream &out) {
+static void GetPrettyFrameLine(
+  const uint32_t address,
+  const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
+  std::ostream &out) {
   out << absl::StrFormat("Frame @ 0x%08X\n", address);
   for (size_t i = 0; i < bits.size(); ++i) {
     const uint32_t &word = bits[i];
@@ -332,9 +347,10 @@ static void GetPrettyFrameLine(const uint32_t address,
   out << "\n";
 }
 
-static void GetFrameLine(const uint32_t address,
-                         const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
-                         std::ostream &out) {
+static void GetFrameLine(
+  const uint32_t address,
+  const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
+  std::ostream &out) {
   out << absl::StrFormat("0x%08X ", address);
   std::vector<std::string> words;
   words.reserve(bits.size());
@@ -345,7 +361,8 @@ static void GetFrameLine(const uint32_t address,
   out << "\n";
 }
 
-static void PrintFrames(const fpga::Frames &frames, std::ostream &out, bool pretty) {
+static void PrintFrames(const fpga::Frames &frames, std::ostream &out,
+                        bool pretty) {
   for (const auto &frame : frames) {
     const uint32_t &address = frame.first;
     const std::array<fpga::word_t, fpga::kFrameWordCount> &bits = frame.second;
@@ -363,36 +380,41 @@ int main(int argc, char *argv[]) {
   const std::vector<char *> args = absl::ParseCommandLine(argc, argv);
   const auto args_count = args.size();
   if (args_count > 2) {
-    std::cerr << absl::ProgramUsageMessage() << std::endl;
+    std::cerr << absl::ProgramUsageMessage() << '\n';
   }
-  const absl::StatusOr<std::string> prjxray_db_path_result = GetOptFlagOrFromEnv(
-      FLAGS_prjxray_db_path, "PRJXRAY_DB_PATH");
+  const absl::StatusOr<std::string> prjxray_db_path_result =
+    GetOptFlagOrFromEnv(FLAGS_prjxray_db_path, "PRJXRAY_DB_PATH");
   if (!prjxray_db_path_result.ok()) {
-    std::cerr << StatusToErrorMessage("get prjxray db path", prjxray_db_path_result.status())
-              << std::endl;
-    std::cerr << absl::ProgramUsageMessage() << std::endl;
+    std::cerr << StatusToErrorMessage("get prjxray db path",
+                                      prjxray_db_path_result.status())
+              << '\n';
+    std::cerr << absl::ProgramUsageMessage() << '\n';
     return 1;
   }
   const std::filesystem::path &prjxray_db_path = prjxray_db_path_result.value();
   if (prjxray_db_path.empty() || !std::filesystem::exists(prjxray_db_path)) {
-    std::cerr << absl::StrFormat("invalid prjxray-db path: \"%s\"", prjxray_db_path) << std::endl;
+    std::cerr << absl::StrFormat("invalid prjxray-db path: \"%s\"",
+                                 prjxray_db_path)
+              << '\n';
     return EXIT_FAILURE;
   }
 
   const std::string part = absl::GetFlag(FLAGS_part);
   if (part.empty()) {
-    std::cerr << "no part provided" << std::endl;
-    std::cerr << absl::ProgramUsageMessage() << std::endl;
+    std::cerr << "no part provided" << '\n';
+    std::cerr << absl::ProgramUsageMessage() << '\n';
     return EXIT_FAILURE;
   }
-  auto part_database_result = fpga::PartDatabase::Parse(prjxray_db_path.string(), part);
+  auto part_database_result =
+    fpga::PartDatabase::Parse(prjxray_db_path.string(), part);
   if (!part_database_result.ok()) {
-    std::cerr << StatusToErrorMessage("part mapping parsing", part_database_result.status())
-              << std::endl;
+    std::cerr << StatusToErrorMessage("part mapping parsing",
+                                      part_database_result.status())
+              << '\n';
     return EXIT_FAILURE;
   }
   FILE *input_stream = stdin;
-  absl::Cleanup file_closer = [input_stream] {
+  const absl::Cleanup file_closer = [input_stream] {
     if (input_stream != stdin) {
       std::fclose(input_stream);
     }
@@ -404,11 +426,12 @@ int main(int argc, char *argv[]) {
     }
   }
   fpga::Frames frames;
-  const auto assembler_result = AssembleFrames(
-      input_stream, part_database_result.value(), frames);
+  const auto assembler_result =
+    AssembleFrames(input_stream, part_database_result.value(), frames);
   if (!assembler_result.ok()) {
-    std::cerr << StatusToErrorMessage("could not assemble frames", assembler_result)
-              << std::endl;
+    std::cerr << StatusToErrorMessage("could not assemble frames",
+                                      assembler_result)
+              << '\n';
     return EXIT_FAILURE;
   }
 

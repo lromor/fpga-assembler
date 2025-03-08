@@ -1,5 +1,11 @@
 #include "fpga/database-parsers.h"
 
+#include <string>
+#include <string_view>
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -89,15 +95,15 @@ TEST(TileGridParser, SampleTileGrid) {
   EXPECT_EQ(tile_b.pin_functions.at("IOB_X0Y0"), "IO_25_14");
 
   const BitsBlock &block = tile_b.bits.at(ConfigBusType::kCLBIOCLK);
-  EXPECT_TRUE(block.alias.has_value());
+  ASSERT_TRUE(block.alias.has_value());
   EXPECT_EQ(block.alias.value().sites.size(), 1);
   EXPECT_EQ(block.base_address, 4194304);  // 0x00400000
 }
 
 TEST(TileGridParser, EmptyTileGrid) {
   constexpr std::string_view kExpectFailTests[] = {"",     "[]", "  ",
-                                                    "\n\n", "32", "asd",
-                                                    R"({
+                                                   "\n\n", "32", "asd",
+                                                   R"({
   "TILE_A": {
     "bits": {},
     "grid_x": 72,
@@ -438,8 +444,9 @@ constexpr std::string_view kSampleDevicesMapperYAML = R"(
 
 // Test some basic expectaions for a sample tilegrid.json
 TEST(PartsInfosParser, SamplePartsAndDevices) {
-  absl::StatusOr<absl::flat_hash_map<std::string, PartInfo>> parts_infos_result =
-    ParsePartsInfos(kSamplePartsMapperYAML, kSampleDevicesMapperYAML);
+  absl::StatusOr<absl::flat_hash_map<std::string, PartInfo>>
+    parts_infos_result =
+      ParsePartsInfos(kSamplePartsMapperYAML, kSampleDevicesMapperYAML);
   ASSERT_TRUE(parts_infos_result.ok()) << parts_infos_result.status().message();
   const absl::flat_hash_map<std::string, PartInfo> &parts_infos =
     parts_infos_result.value();
