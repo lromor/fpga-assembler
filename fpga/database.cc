@@ -5,20 +5,22 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
-#include <unordered_set>
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/str_join.h"
 #include "absl/log/check.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+
 #include "fpga/database-parsers.h"
 #include "fpga/memory-mapped-file.h"
 
 namespace fpga {
 absl::StatusOr<BanksTilesRegistry> BanksTilesRegistry::Create(
   const Part &part, const PackagePins &package_pins) {
-  std::map<std::string, std::vector<uint32_t>> tile_to_banks;
-  std::map<uint32_t, std::unordered_set<std::string>> banks_to_tiles_set;
+  absl::flat_hash_map<std::string, std::vector<uint32_t>> tile_to_banks;
+  absl::flat_hash_map<uint32_t, absl::flat_hash_set<std::string>> banks_to_tiles_set;
   for (const auto &pair : part.iobanks) {
     const std::string tile = "HCLK_IOI3_" + pair.second;
     banks_to_tiles_set[pair.first].insert(tile);
@@ -87,14 +89,14 @@ static absl::StatusOr<PartInfo> ParsePartInfo(
   if (!devices_yaml_content_result.ok()) {
     return devices_yaml_content_result.status();
   }
-  const absl::StatusOr<std::map<std::string, PartInfo>> parts_infos_result =
+  const absl::StatusOr<absl::flat_hash_map<std::string, PartInfo>> parts_infos_result =
     fpga::ParsePartsInfos(
       parts_yaml_content_result.value()->AsStringView(),
       devices_yaml_content_result.value()->AsStringView());
   if (!parts_infos_result.ok()) {
     return parts_infos_result.status();
   }
-  const std::map<std::string, PartInfo> &parts_infos =
+  const absl::flat_hash_map<std::string, PartInfo> &parts_infos =
     parts_infos_result.value();
   if (!parts_infos.contains(part)) {
     return absl::InvalidArgumentError(
@@ -133,17 +135,17 @@ struct TileTypeDatabasePaths {
   std::optional<std::filesystem::path> mask_db;
 };
 
-constexpr absl::string_view kTileTypeJSONPrefix = "tile_type_";
-constexpr absl::string_view kTileTypeJSONSuffix = ".json";
-constexpr absl::string_view KFileNameFormatSegbits = "segbits_%s.db";
-constexpr absl::string_view KFileNameFormatSegbitsBlockRAM =
+constexpr std::string_view kTileTypeJSONPrefix = "tile_type_";
+constexpr std::string_view kTileTypeJSONSuffix = ".json";
+constexpr std::string_view KFileNameFormatSegbits = "segbits_%s.db";
+constexpr std::string_view KFileNameFormatSegbitsBlockRAM =
   "segbits_%s.block_ram.db";
-constexpr absl::string_view KFileNameFormatPseudoPIPs = "ppips_%s.db";
-constexpr absl::string_view KFileNameFormatMask = "mask_%s.db";
+constexpr std::string_view KFileNameFormatPseudoPIPs = "ppips_%s.db";
+constexpr std::string_view KFileNameFormatMask = "mask_%s.db";
 
 absl::Status GetDatabasePaths(
   const std::filesystem::path &path,
-  std::map<std::string, TileTypeDatabasePaths> &out) {
+  absl::flat_hash_map<std::string, TileTypeDatabasePaths> &out) {
   const std::string filename = path.filename();
   const std::filesystem::path base_path = path.parent_path();
 
@@ -189,7 +191,7 @@ absl::Status GetDatabasePaths(
 
 absl::Status IndexTileTypes(
   const std::filesystem::path &database_path,
-  std::map<std::string, TileTypeDatabasePaths> &tile_types_database_paths) {
+  absl::flat_hash_map<std::string, TileTypeDatabasePaths> &tile_types_database_paths) {
   std::error_code ec;
   // Create a recursive directory iterator with options to skip permission
   // errors
@@ -241,7 +243,7 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
     if (!ppips_db.ok()) return ppips_db.status();
     out.pips = ppips_db.value();
   }
-  std::map<ConfigBusType, SegmentsBits> &segment_bits = out.segment_bits;
+  absl::flat_hash_map<ConfigBusType, SegmentsBits> &segment_bits = out.segment_bits;
   // Parse segments bits.
   if (paths.segbits_db.has_value()) {
     const auto content = fpga::MemoryMapFile(paths.segbits_db.value());
@@ -291,7 +293,7 @@ absl::StatusOr<fpga::BanksTilesRegistry> CreateBanksRegistry(
 }
 
 absl::StatusOr<PartDatabase> PartDatabase::Parse(
-  absl::string_view database_path, absl::string_view part_name) {
+  std::string_view database_path, std::string_view part_name) {
   const absl::StatusOr<PartInfo> part_info_result =
     ParsePartInfo(std::filesystem::path(database_path), std::string(part_name));
   if (!part_info_result.ok()) {
@@ -306,7 +308,7 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(
     return tilegrid_result.status();
   }
 
-  std::map<std::string, TileTypeDatabasePaths> tiles_types_databases_paths;
+  absl::flat_hash_map<std::string, TileTypeDatabasePaths> tiles_types_databases_paths;
   absl::Status status = IndexTileTypes(std::filesystem::path(database_path),
                                        tiles_types_databases_paths);
   if (!status.ok()) {
@@ -351,8 +353,8 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
   std::string aliased_feature = feature;
 
   // Materialize aliased bit maps.
-  std::map<ConfigBusType, BitsBlock> aliased_bits_map;
-  for (const auto &pair : tile.bits.value_or(Bits{})) {
+  absl::flat_hash_map<ConfigBusType, BitsBlock> aliased_bits_map;
+  for (const auto &pair : tile.bits) {
     const BitsBlock &bits_block = pair.second;
     const ConfigBusType &bus_type = pair.first;
     if (bits_block.alias.has_value()) {

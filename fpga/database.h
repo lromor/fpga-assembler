@@ -5,16 +5,17 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <string_view>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/string_view.h"
 #include "fpga/database-parsers.h"
 
 namespace fpga {
 // Many to many map between banks and tiles.
 class BanksTilesRegistry {
-  using tile_to_bank_type = std::map<std::string, std::vector<uint32_t>>;
-  using banks_to_tiles_type = std::map<uint32_t, std::vector<std::string>>;
+  using tile_to_bank_type = absl::flat_hash_map<std::string, std::vector<uint32_t>>;
+  using banks_to_tiles_type = absl::flat_hash_map<uint32_t, std::vector<std::string>>;
 
  public:
   using const_iterator = banks_to_tiles_type::const_iterator;
@@ -48,11 +49,11 @@ static_assert(8 * sizeof(word_t) == 32, "expected word size of 32");
 
 // Frame is made of 101 words of 32-bit size.
 // Maps an address to an array of 101 words.
-using Frames = std::map<uint32_t, std::array<word_t, kFrameWordCount>>;
+using Frames = absl::flat_hash_map<bits_addr_t, std::array<word_t, kFrameWordCount>>;
 
 struct SegmentsBitsWithPseudoPIPs {
   PseudoPIPs pips;
-  std::map<ConfigBusType, SegmentsBits> segment_bits;
+  absl::flat_hash_map<ConfigBusType, SegmentsBits> segment_bits;
 };
 
 // Maps tile types to segbits.
@@ -73,8 +74,8 @@ class PartDatabase {
   explicit PartDatabase(std::shared_ptr<Tiles> part_tiles)
       : tiles_(std::move(part_tiles)) {}
 
-  static absl::StatusOr<PartDatabase> Parse(absl::string_view database_path,
-                                            absl::string_view part_name);
+  static absl::StatusOr<PartDatabase> Parse(std::string_view database_path,
+                                            std::string_view part_name);
 
   struct FrameBit {
     uint32_t word;
@@ -92,7 +93,7 @@ class PartDatabase {
   bool AddSegbitsToCache(const std::string &tile_type);
 
   std::shared_ptr<Tiles> tiles_;
-  std::map<std::string, SegmentsBitsWithPseudoPIPs> segment_bits_cache_;
+  absl::flat_hash_map<std::string, SegmentsBitsWithPseudoPIPs> segment_bits_cache_;
 };
 }  // namespace fpga
 #endif  // FPGA_DATABASE_H

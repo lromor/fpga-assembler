@@ -1,17 +1,17 @@
-#ifndef FPGA_MEM_BLOCK_H
-#define FPGA_MEM_BLOCK_H
+#ifndef FPGA_MEMORY_MAPPED_FILE_H
+#define FPGA_MEMORY_MAPPED_FILE_H
 
 #include <filesystem>
+#include <string_view>
 
 #include "absl/status/statusor.h"
-#include "absl/strings/string_view.h"
 
 namespace fpga {
 // Taken from: verible/common/strings/mem-block.h
 class MemoryBlock {
  public:
   virtual ~MemoryBlock() = default;
-  virtual absl::string_view AsStringView() const = 0;
+  virtual std::string_view AsStringView() const = 0;
 
  protected:
   MemoryBlock() = default;
@@ -24,11 +24,11 @@ class MemoryBlock {
 };
 
 absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
-  absl::string_view path);
+    std::string_view path);
 
 inline absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
-  const std::filesystem::path &path) {
-  return MemoryMapFile(absl::string_view(std::string(path)));
+    const std::filesystem::path &path) {
+  return MemoryMapFile(std::string_view(std::string(path)));
 }
 }  // namespace fpga
-#endif  // FPGA_MEM_BLOCK_H
+#endif  // FPGA_MEMORY_MAPPED_FILE_H

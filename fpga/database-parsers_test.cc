@@ -1,6 +1,5 @@
 #include "fpga/database-parsers.h"
 
-#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -13,7 +12,7 @@ void AbslStringify(Sink &sink, const TileFeature &e) {
 }
 
 namespace {
-constexpr absl::string_view kSampleTileGridJSON = R"({
+constexpr std::string_view kSampleTileGridJSON = R"({
   "TILE_A": {
     "bits": {
       "CLB_IO_CLK": {
@@ -80,24 +79,23 @@ TEST(TileGridParser, SampleTileGrid) {
   EXPECT_EQ(tile_a.coord.y, 26);
 
   // Check bits block.
-  EXPECT_TRUE(tile_a.bits.has_value());
+  EXPECT_TRUE(tile_a.bits.size());
   EXPECT_EQ(tile_a.pin_functions.size(), 0);
 
   const Tile &tile_b = tile_grid.at("TILE_B");
-  EXPECT_EQ(tile_b.pin_functions.size(), 1);
-  EXPECT_EQ(tile_b.bits.value().count(ConfigBusType::kCLBIOCLK), 1);
+  EXPECT_EQ(tile_b.bits.contains(ConfigBusType::kCLBIOCLK), 1);
   EXPECT_EQ(tile_b.pin_functions.size(), 1);
   EXPECT_EQ(tile_b.pin_functions.count("IOB_X0Y0"), 1);
   EXPECT_EQ(tile_b.pin_functions.at("IOB_X0Y0"), "IO_25_14");
 
-  const BitsBlock &block = tile_b.bits.value().at(ConfigBusType::kCLBIOCLK);
+  const BitsBlock &block = tile_b.bits.at(ConfigBusType::kCLBIOCLK);
   EXPECT_TRUE(block.alias.has_value());
   EXPECT_EQ(block.alias.value().sites.size(), 1);
   EXPECT_EQ(block.base_address, 4194304);  // 0x00400000
 }
 
 TEST(TileGridParser, EmptyTileGrid) {
-  constexpr absl::string_view kExpectFailTests[] = {"",     "[]", "  ",
+  constexpr std::string_view kExpectFailTests[] = {"",     "[]", "  ",
                                                     "\n\n", "32", "asd",
                                                     R"({
   "TILE_A": {
@@ -116,7 +114,7 @@ TEST(TileGridParser, EmptyTileGrid) {
 }
 
 struct PseudoPIPsParserTestCase {
-  absl::string_view db;
+  std::string_view db;
   PseudoPIPs expected_ppips;
   bool expected_success;
 };
@@ -167,7 +165,7 @@ MATCHER(SegmentBitEquals, "segment bits are equal") {
 }
 
 struct SegmentBitsParserTestCase {
-  absl::string_view db;
+  std::string_view db;
   SegmentsBits expected_segbits;
   bool expected_success;
 };
@@ -206,7 +204,7 @@ TEST(SegmentsBitsParser, CanParseSimpleDatabases) {
 }
 
 struct PackagePinsParserTestCase {
-  absl::string_view db;
+  std::string_view db;
   PackagePins expected_package_pins;
   bool expected_success;
 };
@@ -266,7 +264,7 @@ TEST(PackagePinsParser, CanParseSimpleDatabases) {
   }
 }
 
-constexpr absl::string_view kSamplePartJSON = R"({
+constexpr std::string_view kSamplePartJSON = R"({
   "global_clock_regions": {
     "bottom": {
       "rows": {
@@ -414,7 +412,7 @@ TEST(PartParser, SamplePart) {
   EXPECT_EQ(counts[2], 36);
 }
 
-constexpr absl::string_view kSamplePartsMapperYAML = R"(
+constexpr std::string_view kSamplePartsMapperYAML = R"(
 xc7a100tcsg324-3:
   device: xc7a100t
   package: csg324
@@ -429,7 +427,7 @@ xc7a50tcpg236-1:
   speedgrade: '1'
 )";
 
-constexpr absl::string_view kSampleDevicesMapperYAML = R"(
+constexpr std::string_view kSampleDevicesMapperYAML = R"(
 "xc7a100t":
   fabric: "xc7a100t"
 "xc7a50t":
@@ -440,10 +438,10 @@ constexpr absl::string_view kSampleDevicesMapperYAML = R"(
 
 // Test some basic expectaions for a sample tilegrid.json
 TEST(PartsInfosParser, SamplePartsAndDevices) {
-  absl::StatusOr<std::map<std::string, PartInfo>> parts_infos_result =
+  absl::StatusOr<absl::flat_hash_map<std::string, PartInfo>> parts_infos_result =
     ParsePartsInfos(kSamplePartsMapperYAML, kSampleDevicesMapperYAML);
   ASSERT_TRUE(parts_infos_result.ok()) << parts_infos_result.status().message();
-  const std::map<std::string, PartInfo> &parts_infos =
+  const absl::flat_hash_map<std::string, PartInfo> &parts_infos =
     parts_infos_result.value();
   {
     const std::string kPartName = "xc7a100tcsg324-3";

@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <iostream>
 #include <filesystem>
-#include <unordered_set>
-#include <map>
 #include <string>
 #include <vector>
 
@@ -21,6 +19,9 @@
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
+
 
 #include "fpga/database-parsers.h"
 #include "fpga/database.h"
@@ -63,7 +64,7 @@ std::vector<std::string> GetIOBSites(const fpga::TileGrid &grid, const std::stri
   const fpga::Tile &tile = grid.at(tile_name);
   uint32_t site_y;
   for (const auto &site_pair : tile.sites) {
-    const absl::string_view site_name = site_pair.first;
+    const std::string_view site_name = site_pair.first;
     const std::string site_y_value = std::to_string(site_name[site_name.size() - 1]);
     CHECK(absl::SimpleAtoi(site_y_value, &site_y));
     out.push_back(absl::StrFormat("IOB_Y%d", site_y %2));
@@ -98,7 +99,7 @@ static absl::Status ProcessFasmFeatures(
     const std::string tile_name = tile_feature_segments[0];
     const std::string feature = tile_feature_segments[1];
     const uint64_t bits = tile_feature.bits;
-    std::unordered_set<fpga::ConfigBusType> used_config_buses;
+    absl::flat_hash_set<fpga::ConfigBusType> used_config_buses;
     // Select only bit addresses with value bit set to 1.
     for (int addr = 0; addr < tile_feature.width; ++addr) {
       const unsigned bit_addr = (addr + tile_feature.start_bit);
@@ -131,10 +132,8 @@ static absl::Status ProcessFasmFeatures(
     }
     // Get tilegrid info.
     const fpga::Tile &tile_info = db.tiles().grid.at(tile_name);
-    CHECK(tile_info.bits.has_value());
-    const auto &config_bits = tile_info.bits.value();
     for (const auto &bus : used_config_buses) {
-      const fpga::BitsBlock &info = config_bits.at(bus);
+      const fpga::BitsBlock &info = tile_info.bits.at(bus);
       for (unsigned i = 0; i < info.frames; ++i) {
         frames.insert({info.base_address + i, {}});
       }
@@ -144,7 +143,7 @@ static absl::Status ProcessFasmFeatures(
 }
 
 // Template that for each line should substitute a tile type and a site.
-constexpr absl::string_view kPUDCBPullUpFASMLinesTemplate[] = {
+constexpr std::string_view kPUDCBPullUpFASMLinesTemplate[] = {
   "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_SSTL15_TMDS_33.IN_ONLY",
   "%s.%s.LVCMOS25_LVCMOS33_LVTTL.IN",
   "%s.%s.PULLTYPE.PULLUP",
@@ -176,8 +175,8 @@ static void AddStepDownFeatures(
     const fpga::BanksTilesRegistry &banks,
     const fpga::TileGrid &grid, std::vector<FasmFeature> &features) {
   // Stores a set of strings <tile-type>.<site>
-  std::unordered_set<std::string> used_iob_sites;
-  std::map<uint32_t, std::unordered_set<std::string>> stepdown_banks_tags;
+  absl::flat_hash_set<std::string> used_iob_sites;
+  absl::flat_hash_map<uint32_t, absl::flat_hash_set<std::string>> stepdown_banks_tags;
   for (const auto &feature : features) {
     if (feature.bits == 0) {
       continue;
@@ -187,9 +186,9 @@ static void AddStepDownFeatures(
     if (tile_feature_segments.size() < 3) {
       continue;
     }
-    const absl::string_view tile = tile_feature_segments[0];
-    const absl::string_view site = tile_feature_segments[1];
-    const absl::string_view tag = tile_feature_segments[2];
+    const std::string_view tile = tile_feature_segments[0];
+    const std::string_view site = tile_feature_segments[1];
+    const std::string_view tag = tile_feature_segments[2];
     if (absl::StrContains(tile, "IOB33")) {
       used_iob_sites.insert(absl::StrFormat("%s.%s", tile, site));
     }
@@ -208,7 +207,7 @@ static void AddStepDownFeatures(
 
   for (const auto &bank_tags_pair : stepdown_banks_tags) {
     const uint32_t &bank = bank_tags_pair.first;
-    const std::unordered_set<std::string> &tags =
+    const absl::flat_hash_set<std::string> &tags =
         bank_tags_pair.second;
     const auto maybe_tiles = banks.Tiles(bank);
     CHECK(maybe_tiles.has_value());
@@ -290,7 +289,7 @@ ABSL_FLAG(
     std::string, part, "",
     R"(FPGA part name, e.g. "xc7a35tcsg324-1".)");
 
-static inline std::string Usage(absl::string_view name) {
+static inline std::string Usage(std::string_view name) {
   return absl::StrCat("usage: ", name,
                       " [options] < input.fasm > output.frm\n"
                       R"(
@@ -300,12 +299,12 @@ Output is written to stdout.
 )");
 }
 
-static std::string StatusToErrorMessage(absl::string_view message, const absl::Status &status) {
+static std::string StatusToErrorMessage(std::string_view message, const absl::Status &status) {
   return absl::StrFormat("%s: %s", message, status.message());
 }
 
 static absl::StatusOr<std::string> GetOptFlagOrFromEnv(
-    const absl::Flag<std::optional<std::string>> &flag, absl::string_view env_var) {
+    const absl::Flag<std::optional<std::string>> &flag, std::string_view env_var) {
   const std::optional<std::string> flag_value = absl::GetFlag(flag);
   if (!flag_value.has_value()) {
     const char *value = getenv(std::string(env_var).c_str());

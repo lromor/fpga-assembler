@@ -1,6 +1,7 @@
 #include "fpga/database.h"
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
@@ -10,7 +11,7 @@ namespace {
 struct CorrectMappingAndTileNamesTestCase {
   Part part;
   PackagePins package_pins;
-  absl::StatusOr<std::map<uint32_t, std::vector<std::string>>>
+  absl::StatusOr<absl::flat_hash_map<uint32_t, std::vector<std::string>>>
     expected_banks_tiles_res;
 };
 
@@ -34,19 +35,19 @@ TEST(BanksTilesRegistry, CorrectMappingAndTileNames) {
     if (test.expected_banks_tiles_res.ok()) {
       ASSERT_TRUE(res.ok()) << res.status().message();
     }
-    const std::map<uint32_t, std::vector<std::string>> &expected =
+    const absl::flat_hash_map<uint32_t, std::vector<std::string>> &expected =
       test.expected_banks_tiles_res.value();
     const BanksTilesRegistry &registry = res.value();
     for (const auto &pair : expected) {
       const auto maybe_tiles = registry.Tiles(pair.first);
       EXPECT_TRUE(maybe_tiles.has_value());
       const std::vector<std::string> &tiles_vector = maybe_tiles.value();
-      const std::unordered_set<std::string> actual_tiles(tiles_vector.begin(),
+      const absl::flat_hash_set<std::string> actual_tiles(tiles_vector.begin(),
                                                          tiles_vector.end());
       // Vector must have unique elements (tile names).
       EXPECT_EQ(tiles_vector.size(), actual_tiles.size());
 
-      const std::unordered_set<std::string> expected_tiles(pair.second.begin(),
+      const absl::flat_hash_set<std::string> expected_tiles(pair.second.begin(),
                                                            pair.second.end());
       EXPECT_EQ(actual_tiles, expected_tiles);
 

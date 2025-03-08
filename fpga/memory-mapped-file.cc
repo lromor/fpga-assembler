@@ -13,7 +13,7 @@ class MemoryMappedFile final : public MemoryBlock {
   MemoryMappedFile(char *const data, const size_t size)
       : data_(data), size_(size) {}
 
-  absl::string_view AsStringView() const override { return {data_, size_}; }
+  std::string_view AsStringView() const override { return {data_, size_}; }
 
   ~MemoryMappedFile() override { munmap(data_, size_); }
 
@@ -24,7 +24,7 @@ class MemoryMappedFile final : public MemoryBlock {
 }  // namespace
 
 absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
-  absl::string_view path) {
+  std::string_view path) {
   const int fd = open(path.data(), O_RDONLY);
   if (fd < 0) {
     close(fd);

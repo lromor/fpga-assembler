@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
-#include "absl/strings/string_view.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace fpga {
 enum class ConfigBusType {
@@ -21,10 +21,10 @@ struct Location {
   uint32_t y;
 };
 
-using bits_addr_t = uint32_t;
+using bits_addr_t = uint64_t;
 
 struct BitsBlockAlias {
-  std::map<std::string, std::string> sites;
+  absl::flat_hash_map<std::string, std::string> sites;
   uint32_t start_offset;
   std::string type;
 };
@@ -37,54 +37,36 @@ struct BitsBlock {
   uint32_t words;
 };
 
-using Bits = std::map<ConfigBusType, BitsBlock>;
+using Bits = absl::flat_hash_map<ConfigBusType, BitsBlock>;
 
 struct Tile {
   // Tile type.
-  // Maybe repeated.
   std::string type;
 
   // Grid coordinates.
+  // x: column, increasing right.
+  // y: row, increasing down.
   Location coord;
 
   // Maybe repeated.
   std::optional<std::string> clock_region;
 
   // Tile configuration bits.
-  std::optional<Bits> bits;
+  Bits bits;
 
-  std::map<std::string, std::string> pin_functions;
-  std::map<std::string, std::string> sites;
+  // Indicates the special functions of the Tile pins.
+  // Usually it is related to IOB blocks and indicates
+  // i.e. differential output pins.
+  absl::flat_hash_map<std::string, std::string> pin_functions;
+
+  // Maps <site-name> to <site-type>.
+  absl::flat_hash_map<std::string, std::string> sites;
+
+  // Which sites not to use in the tile.
   std::vector<std::string> prohibited_sites;
 };
 
-// Set of tiles of a specific architecture. Different fpgas might share
-// the different "fabric".
-// Maps tile names (type.feature) to their metadata.
-// For instance the tilegrid item:
-// ```
-// "CLBLL_L_X16Y149": {
-//     "bits": {
-//         "CLB_IO_CLK": {
-//             "baseaddr": "0x00020800",
-//             "frames": 36,
-//             "offset": 99,
-//             "words": 2
-//         }
-//     },
-//     "clock_region": "X0Y2",
-//     "grid_x": 43,
-//     "grid_y": 1,
-//     "pin_functions": {},
-//     "sites": {
-//         "SLICE_X24Y149": "SLICEL",
-//         "SLICE_X25Y149": "SLICEL"
-//     },
-//     "type": "CLBLL_L"
-// }
-// ```
-// Corresponds to a key (tile name) CLBLL_L_X16Y149 and tile type: CLBLL_L
-using TileGrid = std::map<std::string, Tile>;
+using TileGrid = absl::flat_hash_map<std::string, Tile>;
 
 enum class PseudoPIPType {
   kAlways,
@@ -93,7 +75,7 @@ enum class PseudoPIPType {
 };
 
 // Pseudo Programmable Interconnect Points.
-using PseudoPIPs = std::map<std::string, PseudoPIPType>;
+using PseudoPIPs = absl::flat_hash_map<std::string, PseudoPIPType>;
 
 struct SegmentBit {
   // To which word the bit is part of.
@@ -112,14 +94,15 @@ struct TileFeature {
 
   // If not specified in the db, is 0 by default.
   uint32_t address;
+
+  template <typename H>
+  friend H AbslHashValue(H h, const TileFeature& c) {
+    return H::combine(std::move(h), c.tile_feature, c.address);
+  }
+  auto operator<=>(const TileFeature& o) const = default;
 };
 
-inline bool operator<(const TileFeature &lhs, const TileFeature &rhs) {
-  return std::tie(lhs.tile_feature, lhs.address) <
-         std::tie(rhs.tile_feature, rhs.address);
-}
-
-using SegmentsBits = std::map<TileFeature, std::vector<SegmentBit>>;
+using SegmentsBits = absl::flat_hash_map<TileFeature, std::vector<SegmentBit>>;
 
 struct PackagePin {
   std::string pin;
@@ -131,12 +114,12 @@ struct PackagePin {
 
 using PackagePins = std::vector<PackagePin>;
 
-using IOBanksIDsToLocation = std::map<uint32_t, std::string>;
+using IOBanksIDsToLocation = absl::flat_hash_map<uint32_t, std::string>;
 
 // For each column index, associate a number of frames.
 using ConfigColumnsFramesCount = std::vector<uint32_t>;
 
-using ClockRegionRow = std::map<ConfigBusType, ConfigColumnsFramesCount>;
+using ClockRegionRow = absl::flat_hash_map<ConfigBusType, ConfigColumnsFramesCount>;
 
 using GlobalClockRegionHalf = std::vector<ClockRegionRow>;
 
@@ -160,7 +143,7 @@ struct PartInfo {
 
 // Parse family part.
 // <db-root>/<family>/<part>/part.json.
-absl::StatusOr<Part> ParsePartJSON(absl::string_view content);
+absl::StatusOr<Part> ParsePartJSON(std::string_view content);
 
 // Parses file found at:
 // <db-root>/<family>/<part>/package_pins.csv
@@ -169,20 +152,20 @@ absl::StatusOr<Part> ParsePartJSON(absl::string_view content);
 // pin,bank,site,tile,pin_function
 // A2,216,OPAD_X0Y2,GTP_CHANNEL_1_X97Y121,MGTPTXN1_216
 // ```
-absl::StatusOr<PackagePins> ParsePackagePins(absl::string_view content);
+absl::StatusOr<PackagePins> ParsePackagePins(std::string_view content);
 
 // Parse pseudo pips associated to each tile that is part
 // of a tile sub-type.
-absl::StatusOr<PseudoPIPs> ParsePseudoPIPsDatabase(absl::string_view content);
+absl::StatusOr<PseudoPIPs> ParsePseudoPIPsDatabase(std::string_view content);
 
 // Parse the segments bits associated to each tile that is part
 // of a tile sub-type.
 absl::StatusOr<SegmentsBits> ParseSegmentsBitsDatabase(
-  absl::string_view content);
+  std::string_view content);
 
-absl::StatusOr<std::map<std::string, PartInfo>> ParsePartsInfos(
-  absl::string_view parts_mapper_yaml, absl::string_view devices_mapper_yaml);
+absl::StatusOr<absl::flat_hash_map<std::string, PartInfo>> ParsePartsInfos(
+  std::string_view parts_mapper_yaml, std::string_view devices_mapper_yaml);
 
-absl::StatusOr<TileGrid> ParseTileGridJSON(absl::string_view content);
+absl::StatusOr<TileGrid> ParseTileGridJSON(std::string_view content);
 }  // namespace fpga
 #endif  // FPGA_DATABASE_PARSERS_H

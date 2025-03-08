@@ -26,7 +26,6 @@ cc_library(
     deps = [
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings:string_view",
     ],
 )
 
@@ -39,10 +38,10 @@ cc_library(
         "database-parsers.h",
     ],
     deps = [
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings:string_view",
-        "@abseil-cpp//absl/strings:strings",
+        "@abseil-cpp//absl/strings",
         "@rapidjson",
     ],
 )
@@ -63,7 +62,6 @@ cc_test(
     deps = [
         ":database-parsers",
         ":memory-mapped-file",
-        "@abseil-cpp//absl/strings:string_view",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -80,10 +78,11 @@ cc_library(
     deps = [
         ":database-parsers",
         ":memory-mapped-file",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings:string_view",
-        "@abseil-cpp//absl/strings:strings",
+        "@abseil-cpp//absl/strings",
         "@rapidjson",
     ],
 )
@@ -95,13 +94,15 @@ cc_test(
     ],
     deps = [
         ":database",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
 )
 
 cc_binary(
-    name = "assembler",
+    name = "fpga-as",
     srcs = [
         "assembler.cc",
     ],
@@ -111,10 +112,14 @@ cc_binary(
         ":fasm-parser",
         ":memory-mapped-file",
         "@abseil-cpp//absl/cleanup:cleanup",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/flags:flag",
         "@abseil-cpp//absl/flags:parse",
         "@abseil-cpp//absl/flags:usage",
         "@abseil-cpp//absl/log:check",
-        "@abseil-cpp//absl/strings:strings",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
