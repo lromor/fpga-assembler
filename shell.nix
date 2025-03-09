@@ -4,7 +4,7 @@ let
 
   # There is too much volatility between even micro-versions of
   # newer clang-format. Use slightly older version for now.
-  clang_for_formatting = pkgs.llvmPackages_18.clang-tools;
+  clang_for_formatting = pkgs.llvmPackages_17.clang-tools;
 
   # clang tidy: use latest.
   clang_for_tidy = pkgs.llvmPackages_18.clang-tools;

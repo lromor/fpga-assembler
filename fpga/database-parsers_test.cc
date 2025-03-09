@@ -10,7 +10,6 @@
 #include "gtest/gtest.h"
 
 namespace fpga {
-
 template <typename Sink>
 void AbslStringify(Sink &sink, const TileFeature &e) {
   absl::Format(&sink, "(tile_feature=\"%s\", address=%d)", e.tile_feature,

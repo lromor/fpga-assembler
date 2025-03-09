@@ -62,12 +62,12 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt-get install clang-format-18
+          sudo apt-get install clang-format-17
 
       - name: Run formatting style check
         run: |
-          clang-format-18 --version
-          RUNNING_IN_CI=1 CLANG_FORMAT=clang-format-18 \
+          clang-format-17 --version
+          RUNNING_IN_CI=1 CLANG_FORMAT=clang-format-17 \
             scripts/run-clang-format.sh
 
   ClangTidy:

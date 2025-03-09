@@ -30,10 +30,6 @@ or install in system directory that requires root-access:
 sudo install -D --strip bazel-bin/fpga/fpga-as /usr/local/bin/fpga-as
 ```
 
-[fasm-spec]: https://fasm.readthedocs.io/en/stable/#
-[bazel]: https://bazel.build/
-[counter-example]: https://github.com/chipsalliance/f4pga-examples/blob/13f11197b33dae1cde3bf146f317d63f0134eacf/xc7/counter_test/counter.v
-
 # How it works
 
 ## Frames generation
@@ -59,3 +55,7 @@ The next step is to locate the tile metadata in the FPGA fabric's `tilegrid.json
 * offset: `77`
 
 Using this metadata, you can search the segbits database for the specific feature. By matching the tile_type and the FASM feature name, you can identify the correct configuration bits in the tile type segbits file (`segbits_clblm_r.db`). In this case, you would look for the entry corresponding to CLBLM_R.SLICEM_X0.ALUT.INIT and find the entry for address `[34]`. The value 34_06 then provides the coordinates for the word index and the specific bit index to be set.
+
+[fasm-spec]: https://fasm.readthedocs.io/en/stable/#
+[bazel]: https://bazel.build/
+[counter-example]: https://github.com/chipsalliance/f4pga-examples/blob/13f11197b33dae1cde3bf146f317d63f0134eacf/xc7/counter_test/counter.v
