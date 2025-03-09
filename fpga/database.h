@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/btree_map.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 #include "fpga/database-parsers.h"
@@ -56,7 +57,7 @@ static_assert(8 * sizeof(word_t) == 32, "expected word size of 32");
 // Frame is made of 101 words of 32-bit size.
 // Maps an address to an array of 101 words.
 using Frames =
-  absl::flat_hash_map<bits_addr_t, std::array<word_t, kFrameWordCount>>;
+  absl::btree_map<bits_addr_t, std::array<word_t, kFrameWordCount>>;
 
 struct SegmentsBitsWithPseudoPIPs {
   PseudoPIPs pips;

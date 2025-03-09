@@ -263,8 +263,6 @@ static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase &db,
   std::vector<FasmFeature> features;
   // TODO: add required features.
   // TODO: add roi.
-
-  // if FindPUDCBTileSite(db.tiles().grid);
   AddPUDCBFeatures(db.tiles().grid, features);
 
   // Parse fasm.
@@ -342,10 +340,9 @@ static void GetPrettyFrameLine(
   for (size_t i = 0; i < bits.size(); ++i) {
     const uint32_t &word = bits[i];
     if (word) {
-      out << absl::StrFormat("\t%d: 0x%08X\n", i, word);
+      out << absl::StrFormat("  %d: 0x%08X\n", i, word);
     }
   }
-  out << "\n";
 }
 
 static void GetFrameLine(
