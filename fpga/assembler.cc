@@ -430,7 +430,7 @@ int main(int argc, char *argv[]) {
               << '\n';
     return EXIT_FAILURE;
   }
-
   PrintFrames(frames, std::cout, false);
+  // Write bitstream
   return EXIT_SUCCESS;
 }

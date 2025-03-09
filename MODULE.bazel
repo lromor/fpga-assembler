@@ -16,16 +16,7 @@ git_override(
 bazel_dep(name = "abseil-cpp", version = "20240722.0.bcr.2")
 bazel_dep(name = "googletest", version = "1.15.2")
 bazel_dep(name = "rapidjson", version = "1.1.0.bcr.20241007")
-
-## C/C++ deps from local registry.
-bazel_dep(name = "prjxray", version = "0.0-583-t1e53270")
-git_override(
-    module_name = "prjxray",
-    commit = "3a95169e555de315c6b4cb71249107972d944303",
-    patch_strip = 1,
-    patches = ["//bazel:prjxray-add-module-bazel.patch"],
-    remote = "https://github.com/f4pga/prjxray.git",
-)
+bazel_dep(name = "rules_license", version = "1.0.0")
 
 # compilation DB; build_cleaner
 bazel_dep(name = "bant", version = "0.1.14", dev_dependency = True)
