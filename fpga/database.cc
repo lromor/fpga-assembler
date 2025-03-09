@@ -398,23 +398,16 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
     }
   }
 
-  const std::optional<SegmentsBitsWithPseudoPIPs> maybe_segment_bits =
-    tiles_->bits(tile_type);
-  if (!maybe_segment_bits.has_value()) return;
-  const SegmentsBitsWithPseudoPIPs &segment_bits = maybe_segment_bits.value();
-  const std::string tile_segments_bits_key =
-    absl::StrJoin({tile_name, aliased_feature}, ".");
-  if (segment_bits.pips.contains(tile_segments_bits_key)) {
-    return;
-  }
-
   // Fill the cache with the current tile type segbits.
   AddSegbitsToCache(tile_type);
-  if (!segment_bits_cache_.contains(tile_type)) {
-    return;
-  }
+  CHECK(segment_bits_cache_.contains(tile_type));
   const SegmentsBitsWithPseudoPIPs &tile_type_features_bits =
     segment_bits_cache_.at(tile_type);
+  const std::string tile_segments_bits_key =
+    absl::StrJoin({tile_name, aliased_feature}, ".");
+  if (tile_type_features_bits.pips.contains(tile_segments_bits_key)) {
+    return;
+  }
 
   // Search our database of features and get the segbit.
   const struct TileFeature tile_feature = {
