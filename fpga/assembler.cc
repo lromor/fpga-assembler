@@ -272,6 +272,7 @@ static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase &db,
   char *buffer = (char *)malloc(buf_size);
   const absl::Cleanup buffer_freer = [buffer] { free(buffer); };
   ssize_t read_count;
+  // NOLINTNEXTLINE(misc-include-cleaner)
   while ((read_count = getline(&buffer, &buf_size, input_stream)) > 0) {
     const std::string_view content(buffer, read_count);
     const fasm::ParseResult result = fasm::Parse(

@@ -96,6 +96,7 @@ TEST(TileGridParser, SampleTileGrid) {
 
   const BitsBlock &block = tile_b.bits.at(ConfigBusType::kCLBIOCLK);
   ASSERT_TRUE(block.alias.has_value());
+  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
   EXPECT_EQ(block.alias.value().sites.size(), 1);
   EXPECT_EQ(block.base_address, 4194304);  // 0x00400000
 }

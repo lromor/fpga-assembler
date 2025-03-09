@@ -20,14 +20,16 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/strip.h"
 
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "rapidjson/document.h"
-#include "rapidjson/rapidjson.h"
 #undef RAPIDJSON_HAS_STDSTRING
 
 #include "rapidjson/error/en.h"
+#include "rapidjson/error/error.h"
 #include "rapidjson/pointer.h"
+#include "rapidjson/rapidjson.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 

@@ -3,8 +3,16 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <cstddef>
+#include <memory>
+#include <string_view>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_format.h"
 
 namespace fpga {
 namespace {

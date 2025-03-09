@@ -2,8 +2,9 @@
 #define FPGA_DATABASE_PARSERS_H
 
 #include <cstdint>
-#include <map>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"

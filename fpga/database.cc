@@ -1,13 +1,18 @@
 #include "fpga/database.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <iostream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -16,6 +21,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "fpga/database-parsers.h"
@@ -205,7 +211,7 @@ absl::Status IndexTileTypes(
   std::filesystem::recursive_directory_iterator it(
     database_path, std::filesystem::directory_options::skip_permission_denied,
     ec);
-  std::filesystem::recursive_directory_iterator end;
+  const std::filesystem::recursive_directory_iterator end;
   if (ec) {
     return absl::InternalError("could not initialize directory iterator");
   }
@@ -344,9 +350,10 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(std::string_view database_path,
   if (!banks_tiles_registry_result.ok()) {
     return banks_tiles_registry_result.status();
   }
-  Tiles tiles_foo(std::move(tilegrid_result.value()), std::move(tiles_database),
-                  std::move(banks_tiles_registry_result.value()));
-  std::shared_ptr<Tiles> tiles = std::make_shared<Tiles>(tiles_foo);
+  const Tiles tiles_foo(std::move(tilegrid_result.value()),
+                        std::move(tiles_database),
+                        std::move(banks_tiles_registry_result.value()));
+  const std::shared_ptr<Tiles> tiles = std::make_shared<Tiles>(tiles_foo);
   return absl::StatusOr<PartDatabase>(tiles);
 }
 
@@ -410,7 +417,7 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
     segment_bits_cache_.at(tile_type);
 
   // Search our database of features and get the segbit.
-  struct TileFeature tile_feature = {
+  const struct TileFeature tile_feature = {
     .tile_feature = absl::StrJoin({tile_type, aliased_feature}, "."),
     .address = address,
   };

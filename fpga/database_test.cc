@@ -23,23 +23,25 @@ struct CorrectMappingAndTileNamesTestCase {
 // Tile names should be unique per bank. The IOBank locations should be
 // prepended by "HCLK_IOI3_" to make the final tile name.
 TEST(BanksTilesRegistry, CorrectMappingAndTileNames) {
-  // clang_format off
-  const struct CorrectMappingAndTileNamesTestCase kTestCases[] = {
-    {
-      .part = {{},
-               {},
-               IOBanksIDsToLocation{{0, "X1Y78"}, {3, "X2Y43"}, {4, "X1Y78"}}},
-      .package_pins = {{{}, 0, {}, "LIOB33_X0Y93", {}},
-                       {{}, 216, {}, "GTP_CHANNEL_1_X97Y121", {}},
-                       {{}, 0, {}, "HCLK_IOI3_X1Y79", {}}},
-      .expected_banks_tiles_res =
-        {{{0, {"HCLK_IOI3_X1Y78", "LIOB33_X0Y93", "HCLK_IOI3_X1Y79"}},
+  // clang-format off
+  const struct CorrectMappingAndTileNamesTestCase kTestCases[] = {{
+      .part = {
+        {}, {}, IOBanksIDsToLocation{{0, "X1Y78"}, {3, "X2Y43"}, {4, "X1Y78"}}
+      },
+      .package_pins = {
+        {{}, 0, {}, "LIOB33_X0Y93", {}},
+        {{}, 216, {}, "GTP_CHANNEL_1_X97Y121", {}},
+        {{}, 0, {}, "HCLK_IOI3_X1Y79", {}}
+      },
+      .expected_banks_tiles_res = {{
+          {0, {"HCLK_IOI3_X1Y78", "LIOB33_X0Y93", "HCLK_IOI3_X1Y79"}},
           {3, {"HCLK_IOI3_X2Y43"}},
           {4, {"HCLK_IOI3_X1Y78"}},
-          {216, {"GTP_CHANNEL_1_X97Y121"}}}},
+          {216, {"GTP_CHANNEL_1_X97Y121"}}}
+      },
     },
   };
-  // clang_format on
+  // clang-format on
   for (const auto &test : kTestCases) {
     const absl::StatusOr<BanksTilesRegistry> res =
       BanksTilesRegistry::Create(test.part, test.package_pins);
@@ -52,6 +54,7 @@ TEST(BanksTilesRegistry, CorrectMappingAndTileNames) {
     for (const auto &pair : expected) {
       const auto maybe_tiles = registry.Tiles(pair.first);
       ASSERT_TRUE(maybe_tiles.has_value());
+      // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
       const std::vector<std::string> &tiles_vector = maybe_tiles.value();
       const absl::flat_hash_set<std::string> actual_tiles(tiles_vector.begin(),
                                                           tiles_vector.end());
