@@ -1,4 +1,6 @@
 MODULE.bazel.lock
+*.out
+*.summary
 
 # misc
 .DS_Store
