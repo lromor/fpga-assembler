@@ -1,0 +1,120 @@
+name: ci
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  Test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Cache Timestamp
+        id: cache_timestamp
+        uses: nanzm/get-time-action@v2.0
+        with:
+          format: 'YYYY-MM-DD-HH-mm-ss'
+
+      - name: Mount bazel cache
+        uses: actions/cache@v4
+        with:
+          path: "~/.cache/bazel"
+          key: bazelcache_test_${{ steps.cache_timestamp.outputs.time }}
+          restore-keys: bazelcache_test_
+
+      - name: Test
+        run: |
+          export CC=gcc-13
+          export CXX=g++-13
+          bazel test --noshow_progress --keep_going ...
+
+  MacOsBuild:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test
+        run: |
+          bazel test --noshow_progress --keep_going ...
+
+      - name: Build
+        run: |
+          bazel build --noshow_progress -c opt //fpga:fpga-as
+
+  CodeFormatting:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get install clang-format-18
+
+      - name: Run formatting style check
+        run: |
+          clang-format-18 --version
+          CLANG_FORMAT=clang-format-18 scripts/run-clang-format.sh
+          git diff > /tmp/format-diff
+          if [ -s "/tmp/format-diff" ]; then
+            echo "Difference to optimal formatting"
+            cat /tmp/format-diff
+            echo
+            echo "=================== To Fix ==========================="
+            echo "Run scripts/run-format.sh"
+            echo "then"
+            echo "  git commit -a --amend"
+            echo "  git push -f"
+            exit 1
+          fi
+
+  ClangTidy:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get install clang-tidy-18
+
+      - name: Create Cache Timestamp
+        id: cache_timestamp
+        uses: nanzm/get-time-action@v2.0
+        with:
+          format: 'YYYY-MM-DD-HH-mm-ss'
+
+      - name: Mount clang-tidy cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/clang-tidy
+            ~/.cache/bazel
+          key: clang-tidy-cache_${{ steps.cache_timestamp.outputs.time }}
+          restore-keys: clang-tidy-cache_
+
+      - name: Build Compilation DB
+        run: |
+          scripts/make-compilation-db.sh
+
+      - name: Run clang-tidy
+        run: |
+          clang-tidy-18 --version
+          CLANG_TIDY=clang-tidy-18 scripts/run-clang-tidy-cached.cc \
+            || ( cat fpga-assembler_clang-tidy.out ; exit 1)
+
