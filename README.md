@@ -33,3 +33,9 @@ sudo install -D --strip bazel-bin/fpga/fpga-as /usr/local/bin/fpga-as
 [fasm-spec]: https://fasm.readthedocs.io/en/stable/#
 [bazel]: https://bazel.build/
 [counter-example]: https://github.com/chipsalliance/f4pga-examples/blob/13f11197b33dae1cde3bf146f317d63f0134eacf/xc7/counter_test/counter.v
+
+# How it works
+
+## Fasm To Frames
+
+![fasm2frames](./img/fasm2frames.svg)
