@@ -111,9 +111,9 @@ absl::StatusOr<T> Unmarshal(const rapidjson::Value &json) {
 
 template <typename T>
 inline absl::StatusOr<T> GetMember(const rapidjson::Value &json,
-                                   std::string_view name) {
+                                   const char *name) {
   OK_OR_RETURN(IsObject(json));
-  auto itr = json.FindMember(name.data());
+  auto itr = json.FindMember(name);
   if (itr == json.MemberEnd()) {
     return absl::InvalidArgumentError(absl::StrFormat(
       "json attribute \"%s\" not found in %s", name, ValueAsString(json)));
@@ -123,9 +123,9 @@ inline absl::StatusOr<T> GetMember(const rapidjson::Value &json,
 
 template <typename T>
 inline absl::StatusOr<std::optional<T>> OptGetMember(
-  const rapidjson::Value &json, std::string_view name) {
+  const rapidjson::Value &json, const char *name) {
   OK_OR_RETURN(IsObject(json));
-  auto itr = json.FindMember(name.data());
+  auto itr = json.FindMember(name);
   if (itr == json.MemberEnd()) {
     return std::optional<T>{};
   }

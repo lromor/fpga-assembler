@@ -268,7 +268,7 @@ static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase &db,
   // Parse fasm.
   size_t buf_size = 8192;
   char *buffer = (char *)malloc(buf_size);
-  const absl::Cleanup buffer_freer = [buffer] { free(buffer); };
+  const absl::Cleanup buffer_freer = [&buffer] { free(buffer); };
   ssize_t read_count;
   // NOLINTNEXTLINE(misc-include-cleaner)
   while ((read_count = getline(&buffer, &buf_size, input_stream)) > 0) {
@@ -316,11 +316,10 @@ static std::string StatusToErrorMessage(std::string_view message,
 }
 
 static absl::StatusOr<std::string> GetOptFlagOrFromEnv(
-  const absl::Flag<std::optional<std::string>> &flag,
-  std::string_view env_var) {
+  const absl::Flag<std::optional<std::string>> &flag, const char *env_var) {
   const std::optional<std::string> flag_value = absl::GetFlag(flag);
   if (!flag_value.has_value()) {
-    const char *value = getenv(std::string(env_var).c_str());
+    const char *value = getenv(env_var);
     if (value == nullptr) {
       return absl::InvalidArgumentError(
         absl::StrFormat("flag \"%s\" not provided either via commandline or "

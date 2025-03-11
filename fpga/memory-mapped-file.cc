@@ -33,9 +33,8 @@ class MemoryMappedFile final : public MemoryBlock {
 
 absl::StatusOr<std::unique_ptr<MemoryBlock>> MemoryMapFile(
   std::string_view path) {
-  const int fd = open(path.data(), O_RDONLY);
+  const int fd = open(std::string(path).c_str(), O_RDONLY);
   if (fd < 0) {
-    close(fd);
     return absl::Status(absl::ErrnoToStatus(
       errno, absl::StrFormat("could not open file: %s", path)));
   }
