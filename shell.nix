@@ -1,23 +1,30 @@
 { pkgs ? import <nixpkgs> {} }:
 let
   bazel = pkgs.bazel_7;
-  clangTools = pkgs.clang-tools_18;
+
+  # There is too much volatility between even micro-versions of
+  # newer clang-format. Use slightly older version for now.
+  clang_for_formatting = pkgs.llvmPackages_18.clang-tools;
+
+  # clang tidy: use latest.
+  clang_for_tidy = pkgs.llvmPackages_18.clang-tools;
 in
 pkgs.mkShell {
-  name = "prjxtream";
+  name = "fpga-assembler";
   packages = with pkgs; [
     git
     bazel
     jdk
     bash
-    bant
     gdb
 
     # For clang-tidy and clang-format.
-    clangTools
+    clang_for_formatting
+    clang_for_tidy
 
     # For buildifier, buildozer.
     bazel-buildtools
+    bant
 
     # Profiling and sanitizers.
     linuxPackages_latest.perf
@@ -26,10 +33,6 @@ pkgs.mkShell {
     valgrind
   ];
 
-  # Expose as env variables the path to clang tools.
-  CLANG_TIDY = "${clangTools}/bin/clang-tidy";
-  CLANG_FORMAT = "${clangTools}/bin/clang-format";
-
-  # Override .bazelversion. We only care to have bazel 7.
-  USE_BAZEL_VERSION = "${bazel.version}";
+  CLANG_TIDY="${clang_for_tidy}/bin/clang-tidy";
+  CLANG_FORMAT="${clang_for_formatting}/bin/clang-format";
 }
