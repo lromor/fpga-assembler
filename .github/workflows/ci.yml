@@ -67,19 +67,8 @@ jobs:
       - name: Run formatting style check
         run: |
           clang-format-18 --version
-          CLANG_FORMAT=clang-format-18 scripts/run-clang-format.sh
-          git diff > /tmp/format-diff
-          if [ -s "/tmp/format-diff" ]; then
-            echo "Difference to optimal formatting"
-            cat /tmp/format-diff
-            echo
-            echo "=================== To Fix ==========================="
-            echo "Run scripts/run-format.sh"
-            echo "then"
-            echo "  git commit -a --amend"
-            echo "  git push -f"
-            exit 1
-          fi
+          RUNNING_IN_CI=1 CLANG_FORMAT=clang-format-18 \
+            scripts/run-clang-format.sh
 
   ClangTidy:
     runs-on: ubuntu-24.04
@@ -117,4 +106,3 @@ jobs:
           clang-tidy-18 --version
           CLANG_TIDY=clang-tidy-18 scripts/run-clang-tidy-cached.cc \
             || ( cat fpga-assembler_clang-tidy.out ; exit 1)
-
