@@ -1,5 +1,5 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Continuous Integration](https://github.com/lromor/fpga-assembler/workflows/ci/badge.svg)](https://github.com/lromor/fpga-assembler/actions/workflows/ci.yml)
+[![Continuous Integration](https://github.com/lromor/fpga-assembler/workflows/ci/badge.svg?branch=main)](https://github.com/lromor/fpga-assembler/actions/workflows/ci.yml)
 
 # fpga-assembler
 
