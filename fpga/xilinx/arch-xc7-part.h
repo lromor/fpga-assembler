@@ -18,8 +18,7 @@
 #include <string>
 #include <utility>
 
-#include "fpga/xilinx/arch-xc7-defs.h"
-#include "fpga/xilinx/arch-xc7-frame-address.h"
+#include "fpga/xilinx/arch-xc7-frame.h"
 
 namespace fpga {
 namespace xilinx {
@@ -33,7 +32,7 @@ class ConfigurationColumn {
 
   // Returns a ConfigurationColumn that describes a continguous range of
   // minor addresses that encompasses the given
-  // FrameAddresses.  The provided addresses must only
+  // frame addresses.  The provided addresses must only
   // differ only by their minor addresses.
   template <typename T>
   ConfigurationColumn(T first, T last);
@@ -74,7 +73,7 @@ class ConfigurationBus {
   ConfigurationBus() = default;
 
   // Constructs a ConfigurationBus from iterators yielding
-  // FrameAddresses.  The frame address need not be contiguous or sorted
+  // frame addresses.  The frame address need not be contiguous or sorted
   // but they must all have the same block type, row half, and row
   // address components.
   template <typename T>
@@ -124,7 +123,7 @@ class Row {
  public:
   Row() = default;
 
-  // Construct a row from a range of iterators that yield FrameAddresses.
+  // Construct a row from a range of iterators that yield frame addresses.
   // The addresses may be noncontinguous and/or unsorted but all must
   // share the same row half and row components.
   template <typename T>
@@ -181,7 +180,7 @@ class GlobalClockRegion {
   GlobalClockRegion() = default;
 
   // Construct a GlobalClockRegion from iterators that yield
-  // FrameAddresses which are known to be valid. The addresses may be
+  // frame addresses which are known to be valid. The addresses may be
   // noncontinguous and/or unordered but they must share the same row
   // half address component.
   template <typename T>

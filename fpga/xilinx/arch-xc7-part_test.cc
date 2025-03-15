@@ -1,10 +1,18 @@
+/*
+ * Copyright (C) 2017-2020  The Project X-Ray Authors.
+ *
+ * Use of this source code is governed by a ISC-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/ISC
+ *
+ * SPDX-License-Identifier: ISC
+ */
 #include "fpga/xilinx/arch-xc7-part.h"
 
 #include <optional>
 #include <vector>
 
-#include "fpga/xilinx/arch-xc7-defs.h"
-#include "fpga/xilinx/arch-xc7-frame-address.h"
+#include "fpga/xilinx/arch-xc7-frame.h"
 #include "gtest/gtest.h"
 
 namespace fpga {

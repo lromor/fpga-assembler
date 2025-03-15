@@ -3,8 +3,7 @@
 #include <cstdint>
 #include <optional>
 
-#include "fpga/xilinx/arch-xc7-defs.h"
-#include "fpga/xilinx/arch-xc7-frame-address.h"
+#include "fpga/xilinx/arch-xc7-frame.h"
 
 namespace fpga {
 namespace xilinx {

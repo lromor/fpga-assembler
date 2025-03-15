@@ -10,6 +10,7 @@
 #ifndef FPGA_XILINX_CONFIGURATION_PACKET_H
 #define FPGA_XILINX_CONFIGURATION_PACKET_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iomanip>
@@ -24,7 +25,7 @@ namespace fpga {
 namespace xilinx {
 // As described in the configuration user guide for Series-7
 // (UG470, pg. 108) there are two types of configuration packets
-enum class ConfigurationPacketType { kNONE, kTYPE1, kTYPE2 };
+enum class ConfigurationPacketType : uint32_t { kNONE, kTYPE1, kTYPE2 };
 
 // Creates a Type1 or Type2 configuration packet.
 // Specification of the packets for Series-7 can be found in UG470, pg. 108
@@ -44,7 +45,7 @@ class ConfigurationPacketBase {
     // reserved = 3
   };
 
-  ConfigurationPacketBase(unsigned int header_type, Opcode opcode,
+  ConfigurationPacketBase(uint32_t header_type, Opcode opcode,
                           ConfigRegType address,
                           const absl::Span<const uint32_t> &data)
       : header_type_(header_type),
@@ -117,6 +118,34 @@ inline std::ostream &operator<<(
   }
   return o;
 }
+
+template <int Words, typename ConfigurationPacket>
+class ConfigurationPacketWithPayload : public ConfigurationPacket {
+ private:
+  using ConfRegType = ConfigurationPacket::ConfRegType;
+
+ public:
+  ConfigurationPacketWithPayload(ConfigurationPacket::Opcode op,
+                                 ConfRegType reg,
+                                 const std::array<uint32_t, Words> &payload)
+      : ConfigurationPacket(
+          static_cast<uint32_t>(ConfigurationPacketType::kTYPE1), op, reg,
+          absl::Span<uint32_t>(payload_)),
+        payload_(std::move(payload)) {}
+
+ private:
+  std::array<uint32_t, Words> payload_;
+};
+
+template <typename ConfigurationPacket>
+class NopPacket : public ConfigurationPacket {
+ public:
+  using ConfRegType = ConfigurationPacket::ConfRegType;
+  NopPacket()
+      : ConfigurationPacket(
+          static_cast<uint32_t>(ConfigurationPacketType::kTYPE1),
+          ConfigurationPacket::Opcode::kNOP, ConfRegType::kCRC, {}) {}
+};
 }  // namespace xilinx
 }  // namespace fpga
 #endif  // FPGA_XILINX_CONFIGURATION_PACKET_H

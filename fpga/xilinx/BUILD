@@ -54,6 +54,31 @@ cc_test(
 )
 
 cc_library(
+    name = "arch-xc7-frame",
+    srcs = [
+        "arch-xc7-frame.cc",
+    ],
+    hdrs = [
+        "arch-xc7-frame.h",
+    ],
+    deps = [
+        ":bit-ops",
+    ],
+)
+
+cc_test(
+    name = "arch-xc7-frame_test",
+    srcs = [
+        "arch-xc7-frame_test.cc",
+    ],
+    deps = [
+        ":arch-xc7-frame",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "configuration-packet",
     hdrs = [
         "configuration-packet.h",
@@ -61,16 +86,6 @@ cc_library(
     deps = [
         "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "arch-xc7-defs",
-    srcs = [
-        "arch-xc7-defs.cc",
-    ],
-    hdrs = [
-        "arch-xc7-defs.h",
     ],
 )
 
@@ -83,7 +98,7 @@ cc_library(
         "arch-xc7-configuration-packet.h",
     ],
     deps = [
-        ":arch-xc7-defs",
+        ":arch-xc7-frame",
         ":bit-ops",
         ":configuration-packet",
         "@abseil-cpp//absl/types:span",
@@ -97,25 +112,11 @@ cc_test(
     ],
     deps = [
         ":arch-xc7-configuration-packet",
-        ":arch-xc7-defs",
+        ":arch-xc7-frame",
         ":bit-ops",
         "@abseil-cpp//absl/types:span",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "arch-xc7-frame-address",
-    srcs = [
-        "arch-xc7-frame-address.cc",
-    ],
-    hdrs = [
-        "arch-xc7-frame-address.h",
-    ],
-    deps = [
-        ":arch-xc7-defs",
-        ":bit-ops",
     ],
 )
 
@@ -128,8 +129,7 @@ cc_library(
         "arch-xc7-part.h",
     ],
     deps = [
-        ":arch-xc7-defs",
-        ":arch-xc7-frame-address",
+        ":arch-xc7-frame",
     ],
 )
 
@@ -139,9 +139,81 @@ cc_test(
         "arch-xc7-part_test.cc",
     ],
     deps = [
-        ":arch-xc7-defs",
-        ":arch-xc7-frame-address",
+        ":arch-xc7-frame",
         ":arch-xc7-part",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "arch-types",
+    hdrs = [
+        "arch-types.h",
+    ],
+    deps = [
+        ":arch-xc7-configuration-packet",
+        ":arch-xc7-frame",
+        ":arch-xc7-part",
+    ],
+)
+
+cc_library(
+    name = "frames",
+    hdrs = [
+        "frames.h",
+    ],
+    deps = [
+        ":arch-types",
+    ],
+)
+
+cc_test(
+    name = "frames-xc7_test",
+    srcs = [
+        "frames-xc7_test.cc",
+    ],
+    deps = [
+        ":arch-types",
+        ":arch-xc7-frame",
+        ":frames",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "configuration",
+    srcs = [
+        "configuration.cc",
+    ],
+    hdrs = [
+        "configuration.h",
+    ],
+    deps = [
+        ":arch-types",
+        ":arch-xc7-configuration-packet",
+        ":bit-ops",
+        ":configuration-packet",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "configuration-xc7_test",
+    srcs = [
+        "configuration-xc7_test.cc",
+    ],
+    deps = [
+        ":arch-types",
+        ":arch-xc7-frame",
+        ":configuration",
+        ":configuration-packet",
+        ":frames",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
