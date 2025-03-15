@@ -23,11 +23,12 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
-#include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "fpga/database-parsers.h"
 #include "fpga/database.h"
 #include "fpga/fasm-parser.h"
+#include "fpga/xilinx/arch-types.h"
+#include "fpga/xilinx/bitstream.h"
 
 struct TileSiteInfo {
   std::string tile;
@@ -330,6 +331,7 @@ static absl::StatusOr<std::string> GetOptFlagOrFromEnv(
   return flag_value.value();
 }
 
+#if 0
 static void GetPrettyFrameLine(
   const uint32_t address,
   const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
@@ -369,6 +371,7 @@ static void PrintFrames(const fpga::Frames &frames, std::ostream &out,
     }
   }
 }
+#endif
 
 int main(int argc, char *argv[]) {
   const std::string usage = Usage(argv[0]);
@@ -430,7 +433,16 @@ int main(int argc, char *argv[]) {
               << '\n';
     return EXIT_FAILURE;
   }
-  PrintFrames(frames, std::cout, false);
+  const fpga::Part &part_data = part_database_result->tiles().part;
+  const auto bitstream_status =
+    fpga::xilinx::BitStream<fpga::xilinx::Architecture::kXC7>::Encode<
+      fpga::Frames>(part_data, "fasm", "fpga-source", frames, std::cout);
+  if (!bitstream_status.ok()) {
+    std::cerr << StatusToErrorMessage("could not generate bistream",
+                                      bitstream_status)
+              << '\n';
+    return EXIT_FAILURE;
+  }
   // Write bitstream
   return EXIT_SUCCESS;
 }

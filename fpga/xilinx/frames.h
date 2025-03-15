@@ -32,6 +32,10 @@ class Frames {
     data_.insert(address, words);
   }
 
+  Frames() = default;
+  explicit Frames(std::map<FrameAddress, FrameWords> data)
+      : data_(std::move(data)) {}
+
   // Adds empty frames that are present in the tilegrid of a specific part
   // but are missing in the current frames container.
   void AddMissingFrames(const std::optional<Part> &part);

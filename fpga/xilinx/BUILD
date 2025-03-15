@@ -130,6 +130,10 @@ cc_library(
     ],
     deps = [
         ":arch-xc7-frame",
+        "//fpga:database-parsers",
+        "//fpga:memory-mapped-file",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -206,15 +210,106 @@ cc_test(
     srcs = [
         "configuration-xc7_test.cc",
     ],
+    data = [
+        "testdata/xc7-configuration.bit",
+        "testdata/xc7-configuration.debug.bit",
+        "testdata/xc7-configuration.perframecrc.bit",
+        "testdata/xc7-configuration-test.json",
+    ],
     deps = [
         ":arch-types",
         ":arch-xc7-frame",
+        ":bitstream-reader",
         ":configuration",
         ":configuration-packet",
         ":frames",
+        "//fpga:database-parsers",
+        "//fpga:memory-mapped-file",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "bitstream-reader",
+    hdrs = [
+        "bitstream-reader.h",
+    ],
+    deps = [
+        ":arch-types",
+        ":big-endian-span",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "bitstream-reader_test",
+    srcs = [
+        "bitstream-reader-xc7_test.cc",
+    ],
+    deps = [
+        ":arch-types",
+        ":bitstream-reader",
+        "@abseil-cpp//absl/types:span",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "bitstream-writer",
+    srcs = [
+        "bitstream-writer.cc",
+    ],
+    hdrs = [
+        "bitstream-writer.h",
+    ],
+    deps = [
+        ":arch-types",
+        ":arch-xc7-configuration-packet",
+        ":bit-ops",
+        ":configuration-packet",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "bitstream-writer_test",
+    srcs = [
+        "bitstream-writer_test.cc",
+    ],
+    deps = [
+        ":arch-types",
+        ":arch-xc7-configuration-packet",
+        ":bit-ops",
+        ":bitstream-writer",
+        ":configuration-packet",
+        "@abseil-cpp//absl/types:span",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "bitstream",
+    hdrs = [
+        "bitstream.h",
+    ],
+    deps = [
+        ":arch-types",
+        ":bitstream-writer",
+        ":configuration",
+        ":frames",
+        "//fpga:database-parsers",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings:string_view",
     ],
 )

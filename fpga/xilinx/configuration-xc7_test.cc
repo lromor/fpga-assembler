@@ -10,12 +10,18 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <memory>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
+#include "fpga/database-parsers.h"
+#include "fpga/memory-mapped-file.h"
 #include "fpga/xilinx/arch-types.h"
 #include "fpga/xilinx/arch-xc7-frame.h"
+#include "fpga/xilinx/bitstream-reader.h"
 #include "fpga/xilinx/configuration-packet.h"
 #include "fpga/xilinx/configuration.h"
 #include "fpga/xilinx/frames.h"
@@ -139,118 +145,143 @@ TEST(XC7ConfigurationTest, ConstructFromPacketsWithAutoincrement) {
   // NOLINTEND(bugprone-unchecked-optional-access)
 }
 
-// TEST(XC7ConfigurationTest,
-//      DISABLED_DebugAndPerFrameCrcBitstreamsProduceEqualConfigurations) {
-//   auto part = Part::FromFile("configuration_test.yaml");
-//   ASSERT_TRUE(part);
+// Load Part from JSON.
+absl::StatusOr<Part> LoadPartJSON(const std::filesystem::path &path) {
+  const auto block_status = MemoryMapFile(path);
+  if (!block_status.ok()) {
+    return block_status.status();
+  }
+  const auto part_status = ParsePartJSON(block_status.value()->AsStringView());
+  if (!part_status.ok()) {
+    return part_status.status();
+  }
+  return Part::FromPart(part_status.value());
+}
 
-//   auto debug_bitstream = prjxray::MemoryMappedFile::InitWithFile(
-//       "configuration_test.debug.bit");
-//   ASSERT_TRUE(debug_bitstream);
+TEST(XC7ConfigurationTest,
+     DebugAndPerFrameCrcBitstreamsProduceEqualConfigurations) {
+  const std::filesystem::path kTestDataBase = "fpga/xilinx/testdata";
+  auto part = LoadPartJSON(kTestDataBase / "xc7-configuration-test.json");
+  ASSERT_TRUE(part.ok()) << part.status();
 
-//   auto debug_reader = BitstreamReader<Series7>::InitWithBytes(
-//       debug_bitstream->as_bytes());
-//   ASSERT_TRUE(debug_reader);
+  absl::StatusOr<std::unique_ptr<MemoryBlock>> debug_bitstream_status =
+    MemoryMapFile(kTestDataBase / "xc7-configuration.debug.bit");
+  ASSERT_TRUE(debug_bitstream_status.ok()) << debug_bitstream_status.status();
+  auto &debug_bitstream = debug_bitstream_status.value();
+  ASSERT_TRUE(debug_bitstream);
 
-//   auto debug_configuration =
-//       Configuration<Series7>::InitWithPackets(*part, *debug_reader);
-//   ASSERT_TRUE(debug_configuration);
+  auto debug_reader =
+    BitstreamReader<kArch>::InitWithBytes(debug_bitstream->AsBytesView());
+  ASSERT_TRUE(debug_reader);
+  auto debug_configuration =
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    Configuration<kArch>::InitWithPackets(*part, *debug_reader);
+  ASSERT_TRUE(debug_configuration);
 
-//   auto perframecrc_bitstream = prjxray::MemoryMappedFile::InitWithFile(
-//       "configuration_test.perframecrc.bit");
-//   ASSERT_TRUE(perframecrc_bitstream);
+  absl::StatusOr<std::unique_ptr<MemoryBlock>> perframecrc_bitstream_status =
+    MemoryMapFile(kTestDataBase / "xc7-configuration.perframecrc.bit");
+  ASSERT_TRUE(perframecrc_bitstream_status.ok())
+    << perframecrc_bitstream_status.status();
+  auto &perframecrc_bitstream = perframecrc_bitstream_status.value();
+  ASSERT_TRUE(perframecrc_bitstream);
 
-//   auto perframecrc_reader = BitstreamReader<Series7>::InitWithBytes(
-//       perframecrc_bitstream->as_bytes());
-//   ASSERT_TRUE(perframecrc_reader);
+  auto perframecrc_reader =
+    BitstreamReader<kArch>::InitWithBytes(perframecrc_bitstream->AsBytesView());
+  ASSERT_TRUE(perframecrc_reader);
+  auto perframecrc_configuration =
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    Configuration<kArch>::InitWithPackets(*part, *perframecrc_reader);
+  ASSERT_TRUE(perframecrc_configuration);
 
-//   auto perframecrc_configuration =
-//       Configuration<Series7>::InitWithPackets(*part, *perframecrc_reader);
-//   ASSERT_TRUE(perframecrc_configuration);
+  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+  for (auto debug_frame : debug_configuration->frames()) {
+    auto perframecrc_frame =
+      // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+      perframecrc_configuration->frames().find(debug_frame.first);
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    if (perframecrc_frame == perframecrc_configuration->frames().end()) {
+      ADD_FAILURE() << debug_frame.first
+                    << ": missing in perframecrc bitstream";
+      continue;
+    }
 
-//   for (auto debug_frame : debug_configuration->frames()) {
-//     auto perframecrc_frame =
-//         perframecrc_configuration->frames().find(debug_frame.first);
-//     if (perframecrc_frame ==
-//         perframecrc_configuration->frames().end()) {
-//       ADD_FAILURE() << debug_frame.first
-//                     << ": missing in perframecrc bitstream";
-//       continue;
-//     }
+    for (int ii = 0; ii < 101; ++ii) {
+      EXPECT_EQ(perframecrc_frame->second[ii], debug_frame.second[ii])
+        << debug_frame.first << ": word " << ii;
+    }
+  }
+  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+  for (auto perframecrc_frame : perframecrc_configuration->frames()) {
+    auto debug_frame =
+      // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+      debug_configuration->frames().find(perframecrc_frame.first);
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    if (debug_frame == debug_configuration->frames().end()) {
+      ADD_FAILURE() << perframecrc_frame.first
+                    << ": unexpectedly present in "
+                       "perframecrc bitstream";
+    }
+  }
+}
 
-//     for (int ii = 0; ii < 101; ++ii) {
-//       EXPECT_EQ(perframecrc_frame->second[ii],
-//                 debug_frame.second[ii])
-//           << debug_frame.first << ": word " << ii;
-//     }
-//   }
+TEST(XC7ConfigurationTest, DebugAndNormalBitstreamsProduceEqualConfigurations) {
+  const std::filesystem::path kTestDataBase = "fpga/xilinx/testdata";
+  auto part = LoadPartJSON(kTestDataBase / "xc7-configuration-test.json");
+  ASSERT_TRUE(part.ok()) << part.status();
 
-//   for (auto perframecrc_frame : perframecrc_configuration->frames()) {
-//     auto debug_frame =
-//         debug_configuration->frames().find(perframecrc_frame.first);
-//     if (debug_frame == debug_configuration->frames().end()) {
-//       ADD_FAILURE() << perframecrc_frame.first
-//                     << ": unexpectedly present in "
-//           "perframecrc bitstream";
-//     }
-//   }
-// }
+  absl::StatusOr<std::unique_ptr<MemoryBlock>> debug_bitstream_status =
+    MemoryMapFile(kTestDataBase / "xc7-configuration.debug.bit");
+  ASSERT_TRUE(debug_bitstream_status.ok()) << debug_bitstream_status.status();
+  auto &debug_bitstream = debug_bitstream_status.value();
+  ASSERT_TRUE(debug_bitstream);
 
-// TEST(XC7ConfigurationTest,
-// DebugAndNormalBitstreamsProduceEqualConfigurations) {
-//   auto part = xc7series::Part::FromFile("configuration_test.yaml");
-//   ASSERT_TRUE(part);
+  auto debug_reader =
+    BitstreamReader<kArch>::InitWithBytes(debug_bitstream->AsBytesView());
+  ASSERT_TRUE(debug_reader);
+  auto debug_configuration =
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    Configuration<kArch>::InitWithPackets(*part, *debug_reader);
+  ASSERT_TRUE(debug_configuration);
 
-//   auto debug_bitstream = prjxray::MemoryMappedFile::InitWithFile(
-//       "configuration_test.debug.bit");
-//   ASSERT_TRUE(debug_bitstream);
+  absl::StatusOr<std::unique_ptr<MemoryBlock>> normal_bitstream_status =
+    MemoryMapFile(kTestDataBase / "xc7-configuration.bit");
+  ASSERT_TRUE(normal_bitstream_status.ok()) << normal_bitstream_status.status();
+  auto &normal_bitstream = normal_bitstream_status.value();
+  ASSERT_TRUE(normal_bitstream);
 
-//   auto debug_reader = BitstreamReader<Series7>::InitWithBytes(
-//       debug_bitstream->as_bytes());
-//   ASSERT_TRUE(debug_reader);
+  auto normal_reader =
+    BitstreamReader<kArch>::InitWithBytes(normal_bitstream->AsBytesView());
+  ASSERT_TRUE(normal_reader);
+  auto normal_configuration =
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    Configuration<kArch>::InitWithPackets(*part, *normal_reader);
+  ASSERT_TRUE(normal_configuration);
+  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+  for (auto debug_frame : debug_configuration->frames()) {
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    auto normal_frame = normal_configuration->frames().find(debug_frame.first);
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    if (normal_frame == normal_configuration->frames().end()) {
+      ADD_FAILURE() << debug_frame.first << ": missing in normal bitstream";
+      continue;
+    }
 
-//   auto debug_configuration =
-//       Configuration<Series7>::InitWithPackets(*part, *debug_reader);
-//   ASSERT_TRUE(debug_configuration);
-
-//   auto normal_bitstream =
-//       prjxray::MemoryMappedFile::InitWithFile("configuration_test.bit");
-//   ASSERT_TRUE(normal_bitstream);
-
-//   auto normal_reader = BitstreamReader<Series7>::InitWithBytes(
-//       normal_bitstream->as_bytes());
-//   ASSERT_TRUE(normal_reader);
-
-//   auto normal_configuration =
-//       Configuration<Series7>::InitWithPackets(*part, *normal_reader);
-//   ASSERT_TRUE(normal_configuration);
-
-//   for (auto debug_frame : debug_configuration->frames()) {
-//     auto normal_frame =
-//         normal_configuration->frames().find(debug_frame.first);
-//     if (normal_frame == normal_configuration->frames().end()) {
-//       ADD_FAILURE() << debug_frame.first
-//                     << ": missing in normal bitstream";
-//       continue;
-//     }
-
-//     for (int ii = 0; ii < 101; ++ii) {
-//       EXPECT_EQ(normal_frame->second[ii],
-//                 debug_frame.second[ii])
-//           << debug_frame.first << ": word " << ii;
-//     }
-//   }
-
-//   for (auto normal_frame : normal_configuration->frames()) {
-//     auto debug_frame =
-//         debug_configuration->frames().find(normal_frame.first);
-//     if (debug_frame == debug_configuration->frames().end()) {
-//       ADD_FAILURE()
-//           << normal_frame.first
-//           << ": unexpectedly present in normal bitstream";
-//     }
-//   }
-// }
+    for (int ii = 0; ii < 101; ++ii) {
+      EXPECT_EQ(normal_frame->second[ii], debug_frame.second[ii])
+        << debug_frame.first << ": word " << ii;
+    }
+  }
+  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+  for (auto normal_frame : normal_configuration->frames()) {
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    auto debug_frame = debug_configuration->frames().find(normal_frame.first);
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    if (debug_frame == debug_configuration->frames().end()) {
+      ADD_FAILURE() << normal_frame.first
+                    << ": unexpectedly present in normal bitstream";
+    }
+  }
+}
 
 template <typename T>
 T Fill(typename T::value_type value) {

@@ -14,6 +14,7 @@ std::ostream &operator<<(std::ostream &o, BlockType value) {
   case BlockType::kBlockRam: o << "Block RAM"; break;
   case BlockType::kCFGCLB: o << "Config CLB"; break;
   case BlockType::kReserved: o << "Reserved"; break;
+  case BlockType::kInvalid: o << "Invalid"; break;
   }
   return o;
 }

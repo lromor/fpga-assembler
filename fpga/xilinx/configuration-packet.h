@@ -33,9 +33,7 @@ enum class ConfigurationPacketType : uint32_t { kNONE, kTYPE1, kTYPE2 };
 template <typename ConfigRegType, typename Derived>
 class ConfigurationPacketBase {
  public:
-  using ParseResult =
-    std::pair<absl::Span<uint32_t>,
-              absl::optional<ConfigurationPacketBase<ConfigRegType, Derived>>>;
+  using ParseResult = std::pair<absl::Span<uint32_t>, absl::optional<Derived>>;
 
   // Opcodes as specified in UG470 page 108
   enum class Opcode {

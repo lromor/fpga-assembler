@@ -52,6 +52,7 @@ enum class BlockType : unsigned int {
   kBlockRam = 0x1,
   kCFGCLB = 0x2,
   kReserved = 0x3,
+  kInvalid = 0xFFFFFFFF,
 };
 
 std::ostream &operator<<(std::ostream &o, BlockType value);

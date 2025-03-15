@@ -12,6 +12,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 
 #include "absl/types/span.h"
@@ -115,6 +116,13 @@ BigEndianSpan<WordType, typename Container::value_type> make_big_endian_span(
   Container &bytes) {
   return BigEndianSpan<WordType, typename Container::value_type>(
     absl::Span<typename Container::value_type>(bytes));
+}
+
+template <typename WordType>
+BigEndianSpan<WordType, const uint8_t> make_big_endian_span(
+  absl::Span<const uint8_t> &bytes) {
+  return BigEndianSpan<WordType, const uint8_t>(
+    absl::Span<const uint8_t>(bytes));
 }
 }  // namespace xilinx
 }  // namespace fpga
