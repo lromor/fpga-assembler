@@ -1,4 +1,15 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@rules_license//rules:license.bzl", "license")
+
+package(
+    default_applicable_licenses = [":license"],
+)
+
+license(
+    name = "license",
+    package_name = "fpga",
+    license_kind = "@rules_license//licenses/spdx:Apache-2.0",
+)
 
 cc_library(
     name = "fasm-parser",
