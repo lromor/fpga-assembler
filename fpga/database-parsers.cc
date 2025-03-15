@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "absl/base/optimization.h"
@@ -354,9 +355,13 @@ absl::StatusOr<Part> Unmarshal(const rapidjson::Value &json) {
   struct Part part;
   OK_OR_RETURN(IsObject(json));
   ASSIGN_OR_RETURN(part.idcode, GetMember<uint32_t>(json, "idcode"));
-  ASSIGN_OR_RETURN(
-    part.iobanks,
-    (GetMember<absl::flat_hash_map<uint32_t, std::string>>(json, "iobanks")));
+  std::optional<IOBanksIDsToLocation> iobanks;
+  ASSIGN_OR_RETURN(iobanks,
+                   (OptGetMember<absl::flat_hash_map<uint32_t, std::string>>(
+                     json, "iobanks")));
+  if (iobanks) {
+    part.iobanks = std::move(iobanks.value());
+  }
   ASSIGN_OR_RETURN(part.global_clock_regions, (GetMember<GlobalClockRegions>(
                                                 json, "global_clock_regions")));
   return part;

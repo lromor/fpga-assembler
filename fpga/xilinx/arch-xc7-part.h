@@ -18,6 +18,8 @@
 #include <string>
 #include <utility>
 
+#include "absl/status/statusor.h"
+#include "fpga/database-parsers.h"
 #include "fpga/xilinx/arch-xc7-frame.h"
 
 namespace fpga {
@@ -69,9 +71,15 @@ ConfigurationColumn::ConfigurationColumn(T first, T last) {
 // within a Row.  An instance of ConfigurationBus will contain one or more
 // ConfigurationColumns.
 class ConfigurationBus {
+ private:
+  using container_type = std::map<unsigned int, ConfigurationColumn>;
+
  public:
   ConfigurationBus() = default;
 
+  explicit ConfigurationBus(
+    std::map<unsigned int, ConfigurationColumn> configuration_columns)
+      : configuration_columns_(std::move(configuration_columns)) {}
   // Constructs a ConfigurationBus from iterators yielding
   // frame addresses.  The frame address need not be contiguous or sorted
   // but they must all have the same block type, row half, and row
@@ -91,7 +99,7 @@ class ConfigurationBus {
   std::optional<FrameAddress> GetNextFrameAddress(FrameAddress address) const;
 
  private:
-  std::map<unsigned int, ConfigurationColumn> configuration_columns_;
+  container_type configuration_columns_;
 };
 
 template <typename T>
@@ -120,6 +128,9 @@ ConfigurationBus::ConfigurationBus(T first, T last) {
 }
 
 class Row {
+ private:
+  using container_type = std::map<BlockType, ConfigurationBus>;
+
  public:
   Row() = default;
 
@@ -128,6 +139,9 @@ class Row {
   // share the same row half and row components.
   template <typename T>
   Row(T first, T last);
+
+  explicit Row(container_type configuration_buses)
+      : configuration_buses_(std::move(configuration_buses)) {}
 
   // Returns true if the provided address falls within a valid range
   // attributed to this row.  Only the block type, column, and minor
@@ -143,7 +157,7 @@ class Row {
   std::optional<FrameAddress> GetNextFrameAddress(FrameAddress address) const;
 
  private:
-  std::map<BlockType, ConfigurationBus> configuration_buses_;
+  container_type configuration_buses_;
 };
 
 template <typename T>
@@ -176,8 +190,13 @@ Row::Row(T first, T last) {
 // tiles that divide the chip into top and bottom "halves". Each half may
 // contains any number of rows, buses, and columns.
 class GlobalClockRegion {
+ private:
+  using container_type = std::map<unsigned int, Row>;
+
  public:
   GlobalClockRegion() = default;
+
+  explicit GlobalClockRegion(container_type rows) : rows_(std::move(rows)) {}
 
   // Construct a GlobalClockRegion from iterators that yield
   // frame addresses which are known to be valid. The addresses may be
@@ -185,6 +204,10 @@ class GlobalClockRegion {
   // half address component.
   template <typename T>
   GlobalClockRegion(T first, T last);
+
+  GlobalClockRegion(container_type::const_iterator first,
+                    container_type::const_iterator last)
+      : rows_(first, last) {}
 
   // Returns true if the address falls within a valid range inside the
   // global clock region. The row half address component is ignored as it
@@ -200,7 +223,7 @@ class GlobalClockRegion {
   std::optional<FrameAddress> GetNextFrameAddress(FrameAddress address) const;
 
  private:
-  std::map<unsigned int, Row> rows_;
+  container_type rows_;
 };
 
 template <typename T>
@@ -229,7 +252,7 @@ class Part {
  public:
   constexpr static uint32_t kInvalidIdcode = 0;
 
-  static std::optional<Part> FromFile(const std::string &path);
+  static absl::StatusOr<Part> FromPart(const fpga::Part &part);
 
   // Constructs an invalid part with a zero IDCODE. Required for YAML
   // conversion but shouldn't be used otherwise.
@@ -241,6 +264,11 @@ class Part {
 
   template <typename T>
   Part(uint32_t idcode, T first, T last);
+
+  Part(uint32_t idcode, GlobalClockRegion top, GlobalClockRegion bottom)
+      : idcode_(idcode),
+        top_region_(std::move(top)),
+        bottom_region_(std::move(bottom)) {}
 
   uint32_t idcode() const { return idcode_; }
 

@@ -3,6 +3,7 @@ load("@rules_license//rules:license.bzl", "license")
 
 package(
     default_applicable_licenses = [":license"],
+    default_visibility = ["//:__subpackages__"],
 )
 
 license(
@@ -38,6 +39,7 @@ cc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -134,6 +136,8 @@ cc_binary(
         ":database-parsers",
         ":fasm-parser",
         ":memory-mapped-file",
+        "//fpga/xilinx:arch-types",
+        "//fpga/xilinx:bitstream",
         "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",

@@ -79,7 +79,6 @@ class ConfigurationPacket
  private:
   using BaseType =
     ConfigurationPacketBase<ConfigurationRegister, ConfigurationPacket>;
-  using ParseResult = BaseType::ParseResult;
 
  public:
   using BaseType::BaseType;

@@ -74,13 +74,15 @@ class PartDatabase {
   ~PartDatabase() = default;
   struct Tiles {
     Tiles(TileGrid grid, TileTypesSegmentsBitsGetter bits,
-          BanksTilesRegistry banks)
+          BanksTilesRegistry banks, Part part)
         : grid(std::move(grid)),
           bits(std::move(bits)),
-          banks(std::move(banks)) {}
+          banks(std::move(banks)),
+          part(std::move(part)) {}
     TileGrid grid;
     TileTypesSegmentsBitsGetter bits;
     BanksTilesRegistry banks;
+    Part part;
   };
   explicit PartDatabase(std::shared_ptr<Tiles> part_tiles)
       : tiles_(std::move(part_tiles)) {}

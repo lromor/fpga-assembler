@@ -1,13 +1,73 @@
 #include "fpga/xilinx/arch-xc7-part.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
+#include <vector>
 
+#include "absl/log/check.h"
+#include "fpga/database-parsers.h"
 #include "fpga/xilinx/arch-xc7-frame.h"
 
 namespace fpga {
 namespace xilinx {
 namespace xc7 {
+namespace {
+static BlockType BlockTypeFrom(const fpga::ConfigBusType type) {
+  switch (type) {
+  case ConfigBusType::kCLBIOCLK: return BlockType::kCLBIOCLK;
+  case ConfigBusType::kBlockRam: return BlockType::kBlockRam;
+  case ConfigBusType::kCFGCLB: return BlockType::kCLBIOCLK;
+  default: break;
+  }
+  return BlockType::kInvalid;
+}
+
+absl::StatusOr<Row> RowFrom(const fpga::ClockRegionRow &clock_region_row) {
+  std::map<BlockType, ConfigurationBus> row;
+  for (const auto &bus_column_pair : clock_region_row) {
+    const std::vector<unsigned int> &config_column = bus_column_pair.second;
+    if (config_column.empty()) {
+      continue;
+    }
+    const BlockType block_type = BlockTypeFrom(bus_column_pair.first);
+    std::map<unsigned int, ConfigurationColumn> configuration_bus;
+    for (size_t i = 0; i < config_column.size(); ++i) {
+      configuration_bus.emplace(i, config_column[i]);
+    }
+    row.emplace(block_type, ConfigurationBus(configuration_bus));
+  }
+  return Row(row);
+}
+
+absl::StatusOr<GlobalClockRegion> GlobalClockRegionFrom(
+  const fpga::GlobalClockRegionHalf &half) {
+  std::map<unsigned int, Row> rows;
+  for (size_t i = 0; i < half.size(); ++i) {
+    const absl::StatusOr<Row> row_status = RowFrom(half[i]);
+    if (!row_status.ok()) {
+      return row_status.status();
+    }
+    rows.emplace(i, row_status.value());
+  }
+  return GlobalClockRegion(rows);
+}
+}  // namespace
+absl::StatusOr<Part> Part::FromPart(const fpga::Part &part) {
+  absl::StatusOr<GlobalClockRegion> bottom =
+    GlobalClockRegionFrom(part.global_clock_regions.bottom_rows);
+  if (!bottom.ok()) {
+    return bottom.status();
+  }
+  absl::StatusOr<GlobalClockRegion> top =
+    GlobalClockRegionFrom(part.global_clock_regions.top_rows);
+  if (!top.ok()) {
+    return top.status();
+  }
+  return Part(part.idcode, top.value(), bottom.value());
+}
+
 bool ConfigurationColumn::IsValidFrameAddress(FrameAddress address) const {
   return address.minor() < frame_count_;
 }
@@ -181,7 +241,6 @@ std::optional<FrameAddress> Part::GetNextFrameAddress(
   }
   return {};
 }
-
 }  // namespace xc7
 }  // namespace xilinx
 }  // namespace fpga

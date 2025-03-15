@@ -280,19 +280,7 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
 }
 
 absl::StatusOr<fpga::BanksTilesRegistry> CreateBanksRegistry(
-  const std::filesystem::path &part_json_path,
-  const std::filesystem::path &package_pins_path) {
-  // Parse part.json.
-  const absl::StatusOr<std::unique_ptr<fpga::MemoryBlock>> part_json_result =
-    fpga::MemoryMapFile(part_json_path);
-  if (!part_json_result.ok()) return part_json_result.status();
-  const absl::StatusOr<fpga::Part> part_result =
-    fpga::ParsePartJSON(part_json_result.value()->AsStringView());
-  if (!part_result.ok()) {
-    return part_result.status();
-  }
-  const fpga::Part &part = part_result.value();
-
+  const fpga::Part &part, const std::filesystem::path &package_pins_path) {
   // Parse package pins.
   const absl::StatusOr<std::unique_ptr<fpga::MemoryBlock>>
     package_pins_csv_result = fpga::MemoryMapFile(package_pins_path);
@@ -344,16 +332,27 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(std::string_view database_path,
     }
     return {};
   };
-  auto banks_tiles_registry_result = CreateBanksRegistry(
-    std::filesystem::path(database_path) / part_name / "part.json",
-    std::filesystem::path(database_path) / part_name / "package_pins.csv");
+  // Parse part.json.
+  const absl::StatusOr<std::unique_ptr<fpga::MemoryBlock>> part_json_result =
+    fpga::MemoryMapFile(std::filesystem::path(database_path) / part_name /
+                        "part.json");
+  if (!part_json_result.ok()) return part_json_result.status();
+  const absl::StatusOr<fpga::Part> part_result =
+    fpga::ParsePartJSON(part_json_result.value()->AsStringView());
+  if (!part_result.ok()) {
+    return part_result.status();
+  }
+  const fpga::Part &part = part_result.value();
+
+  auto banks_tiles_registry_result =
+    CreateBanksRegistry(part, std::filesystem::path(database_path) / part_name /
+                                "package_pins.csv");
   if (!banks_tiles_registry_result.ok()) {
     return banks_tiles_registry_result.status();
   }
-  const Tiles tiles_foo(std::move(tilegrid_result.value()),
-                        std::move(tiles_database),
-                        std::move(banks_tiles_registry_result.value()));
-  const std::shared_ptr<Tiles> tiles = std::make_shared<Tiles>(tiles_foo);
+  const std::shared_ptr<Tiles> tiles = std::make_shared<Tiles>(
+    std::move(tilegrid_result.value()), std::move(tiles_database),
+    std::move(banks_tiles_registry_result.value()), part);
   return absl::StatusOr<PartDatabase>(tiles);
 }
 

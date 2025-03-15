@@ -85,7 +85,7 @@ struct SegmentBit {
   // Word index of the bit to enable.
   uint32_t word_bit;
 
-  // If the char '!' is prepended.
+  // False if the char '!' is prepended.
   bool is_set;
 };
 
