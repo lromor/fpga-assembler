@@ -31,6 +31,9 @@ pkgs.mkShell {
     pprof
     perf_data_converter
     valgrind
+
+    # FPGA utils.
+    openfpgaloader
   ];
 
   CLANG_TIDY="${clang_for_tidy}/bin/clang-tidy";
