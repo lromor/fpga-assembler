@@ -2,10 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <map>
 #include <optional>
 #include <vector>
 
+#include "absl/container/btree_map.h"
 #include "absl/log/check.h"
 #include "fpga/database-parsers.h"
 #include "fpga/xilinx/arch-xc7-frame.h"
@@ -25,14 +25,14 @@ static BlockType BlockTypeFrom(const fpga::ConfigBusType type) {
 }
 
 absl::StatusOr<Row> RowFrom(const fpga::ClockRegionRow &clock_region_row) {
-  std::map<BlockType, ConfigurationBus> row;
+  absl::btree_map<BlockType, ConfigurationBus> row;
   for (const auto &bus_column_pair : clock_region_row) {
     const std::vector<unsigned int> &config_column = bus_column_pair.second;
     if (config_column.empty()) {
       continue;
     }
     const BlockType block_type = BlockTypeFrom(bus_column_pair.first);
-    std::map<unsigned int, ConfigurationColumn> configuration_bus;
+    absl::btree_map<unsigned int, ConfigurationColumn> configuration_bus;
     for (size_t i = 0; i < config_column.size(); ++i) {
       configuration_bus.emplace(i, config_column[i]);
     }
@@ -43,7 +43,7 @@ absl::StatusOr<Row> RowFrom(const fpga::ClockRegionRow &clock_region_row) {
 
 absl::StatusOr<GlobalClockRegion> GlobalClockRegionFrom(
   const fpga::GlobalClockRegionHalf &half) {
-  std::map<unsigned int, Row> rows;
+  absl::btree_map<unsigned int, Row> rows;
   for (size_t i = 0; i < half.size(); ++i) {
     const absl::StatusOr<Row> row_status = RowFrom(half[i]);
     if (!row_status.ok()) {

@@ -10,7 +10,6 @@
 #ifndef FPGA_XILINX_FRAMES_H
 #define FPGA_XILINX_FRAMES_H
 
-#include <map>
 #include <optional>
 
 #include "fpga/xilinx/arch-types.h"
@@ -33,7 +32,7 @@ class Frames {
   }
 
   Frames() = default;
-  explicit Frames(std::map<FrameAddress, FrameWords> data)
+  explicit Frames(absl::btree_map<FrameAddress, FrameWords> data)
       : data_(std::move(data)) {}
 
   // Adds empty frames that are present in the tilegrid of a specific part
@@ -41,10 +40,10 @@ class Frames {
   void AddMissingFrames(const std::optional<Part> &part);
 
   // Returns the map with frame addresses and corresponding data
-  std::map<FrameAddress, FrameWords> &GetFrames() { return data_; }
+  absl::btree_map<FrameAddress, FrameWords> &GetFrames() { return data_; }
 
  private:
-  std::map<FrameAddress, FrameWords> data_;
+  absl::btree_map<FrameAddress, FrameWords> data_;
 
   // Updates the ECC information in the frame
   void UpdateECC(FrameWords &words);

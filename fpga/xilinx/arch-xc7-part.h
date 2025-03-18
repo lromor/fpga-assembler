@@ -13,11 +13,11 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <map>
 #include <optional>
 #include <string>
 #include <utility>
 
+#include "absl/container/btree_map.h"
 #include "absl/status/statusor.h"
 #include "fpga/database-parsers.h"
 #include "fpga/xilinx/arch-xc7-frame.h"
@@ -72,13 +72,12 @@ ConfigurationColumn::ConfigurationColumn(T first, T last) {
 // ConfigurationColumns.
 class ConfigurationBus {
  private:
-  using container_type = std::map<unsigned int, ConfigurationColumn>;
+  using container_type = absl::btree_map<unsigned int, ConfigurationColumn>;
 
  public:
   ConfigurationBus() = default;
 
-  explicit ConfigurationBus(
-    std::map<unsigned int, ConfigurationColumn> configuration_columns)
+  explicit ConfigurationBus(container_type configuration_columns)
       : configuration_columns_(std::move(configuration_columns)) {}
   // Constructs a ConfigurationBus from iterators yielding
   // frame addresses.  The frame address need not be contiguous or sorted
@@ -129,7 +128,7 @@ ConfigurationBus::ConfigurationBus(T first, T last) {
 
 class Row {
  private:
-  using container_type = std::map<BlockType, ConfigurationBus>;
+  using container_type = absl::btree_map<BlockType, ConfigurationBus>;
 
  public:
   Row() = default;
@@ -191,7 +190,7 @@ Row::Row(T first, T last) {
 // contains any number of rows, buses, and columns.
 class GlobalClockRegion {
  private:
-  using container_type = std::map<unsigned int, Row>;
+  using container_type = absl::btree_map<unsigned int, Row>;
 
  public:
   GlobalClockRegion() = default;

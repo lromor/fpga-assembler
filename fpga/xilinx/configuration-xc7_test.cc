@@ -14,6 +14,7 @@
 #include <memory>
 #include <vector>
 
+#include "absl/log/check.h"
 #include "absl/status/statusor.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
@@ -168,15 +169,14 @@ TEST(XC7ConfigurationTest,
     MemoryMapFile(kTestDataBase / "xc7-configuration.debug.bit");
   ASSERT_TRUE(debug_bitstream_status.ok()) << debug_bitstream_status.status();
   auto &debug_bitstream = debug_bitstream_status.value();
-  ASSERT_TRUE(debug_bitstream);
+  CHECK(debug_bitstream);
 
   auto debug_reader =
     BitstreamReader<kArch>::InitWithBytes(debug_bitstream->AsBytesView());
-  ASSERT_TRUE(debug_reader);
+  CHECK(debug_reader.has_value());
   auto debug_configuration =
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     Configuration<kArch>::InitWithPackets(*part, *debug_reader);
-  ASSERT_TRUE(debug_configuration);
+  CHECK(debug_configuration.has_value());
 
   absl::StatusOr<std::unique_ptr<MemoryBlock>> perframecrc_bitstream_status =
     MemoryMapFile(kTestDataBase / "xc7-configuration.perframecrc.bit");
@@ -187,18 +187,14 @@ TEST(XC7ConfigurationTest,
 
   auto perframecrc_reader =
     BitstreamReader<kArch>::InitWithBytes(perframecrc_bitstream->AsBytesView());
-  ASSERT_TRUE(perframecrc_reader);
+  CHECK(perframecrc_reader.has_value());
   auto perframecrc_configuration =
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     Configuration<kArch>::InitWithPackets(*part, *perframecrc_reader);
-  ASSERT_TRUE(perframecrc_configuration);
+  CHECK(perframecrc_configuration.has_value());
 
-  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
   for (auto debug_frame : debug_configuration->frames()) {
     auto perframecrc_frame =
-      // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
       perframecrc_configuration->frames().find(debug_frame.first);
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     if (perframecrc_frame == perframecrc_configuration->frames().end()) {
       ADD_FAILURE() << debug_frame.first
                     << ": missing in perframecrc bitstream";
@@ -210,12 +206,9 @@ TEST(XC7ConfigurationTest,
         << debug_frame.first << ": word " << ii;
     }
   }
-  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
   for (auto perframecrc_frame : perframecrc_configuration->frames()) {
     auto debug_frame =
-      // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
       debug_configuration->frames().find(perframecrc_frame.first);
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     if (debug_frame == debug_configuration->frames().end()) {
       ADD_FAILURE() << perframecrc_frame.first
                     << ": unexpectedly present in "
@@ -233,15 +226,14 @@ TEST(XC7ConfigurationTest, DebugAndNormalBitstreamsProduceEqualConfigurations) {
     MemoryMapFile(kTestDataBase / "xc7-configuration.debug.bit");
   ASSERT_TRUE(debug_bitstream_status.ok()) << debug_bitstream_status.status();
   auto &debug_bitstream = debug_bitstream_status.value();
-  ASSERT_TRUE(debug_bitstream);
+  CHECK(debug_bitstream);
 
   auto debug_reader =
     BitstreamReader<kArch>::InitWithBytes(debug_bitstream->AsBytesView());
-  ASSERT_TRUE(debug_reader);
+  CHECK(debug_reader.has_value());
   auto debug_configuration =
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     Configuration<kArch>::InitWithPackets(*part, *debug_reader);
-  ASSERT_TRUE(debug_configuration);
+  CHECK(debug_configuration.has_value());
 
   absl::StatusOr<std::unique_ptr<MemoryBlock>> normal_bitstream_status =
     MemoryMapFile(kTestDataBase / "xc7-configuration.bit");
@@ -251,16 +243,13 @@ TEST(XC7ConfigurationTest, DebugAndNormalBitstreamsProduceEqualConfigurations) {
 
   auto normal_reader =
     BitstreamReader<kArch>::InitWithBytes(normal_bitstream->AsBytesView());
-  ASSERT_TRUE(normal_reader);
+  CHECK(normal_reader.has_value());
   auto normal_configuration =
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     Configuration<kArch>::InitWithPackets(*part, *normal_reader);
-  ASSERT_TRUE(normal_configuration);
-  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-  for (auto debug_frame : debug_configuration->frames()) {
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    auto normal_frame = normal_configuration->frames().find(debug_frame.first);
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+  CHECK(normal_configuration.has_value());
+  for (const auto &debug_frame : debug_configuration->frames()) {
+    const auto normal_frame =
+      normal_configuration->frames().find(debug_frame.first);
     if (normal_frame == normal_configuration->frames().end()) {
       ADD_FAILURE() << debug_frame.first << ": missing in normal bitstream";
       continue;
@@ -271,11 +260,8 @@ TEST(XC7ConfigurationTest, DebugAndNormalBitstreamsProduceEqualConfigurations) {
         << debug_frame.first << ": word " << ii;
     }
   }
-  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-  for (auto normal_frame : normal_configuration->frames()) {
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+  for (const auto &normal_frame : normal_configuration->frames()) {
     auto debug_frame = debug_configuration->frames().find(normal_frame.first);
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     if (debug_frame == debug_configuration->frames().end()) {
       ADD_FAILURE() << normal_frame.first
                     << ": unexpectedly present in normal bitstream";
@@ -356,13 +342,11 @@ TEST(XC7ConfigurationTest, CheckForPaddingFrames) {
 
   auto test_config =
     Configuration<Architecture::kXC7>::InitWithPackets(*test_part, packets);
-  ASSERT_TRUE(test_config);
-  // NOLINTBEGIN(bugprone-unchecked-optional-access)
+  CHECK(test_config.has_value());
   ASSERT_EQ(test_config->frames().size(), 5);
   for (const auto &frame : test_config->frames()) {
     EXPECT_EQ(frame.second, frames.GetFrames().at(frame.first));
   }
-  // NOLINTEND(bugprone-unchecked-optional-access)
 }
 }  // namespace
 }  // namespace xilinx

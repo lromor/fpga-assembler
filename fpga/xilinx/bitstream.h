@@ -1,11 +1,11 @@
 #ifndef FPGA_XILINX_BITSTREAM_H
 #define FPGA_XILINX_BITSTREAM_H
 
-#include <map>
 #include <optional>
 #include <ostream>
 #include <string>
 
+#include "absl/container/btree_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -35,7 +35,7 @@ class BitStream {
                              absl::string_view part_name,
                              absl::string_view source_name,
                              const FramesData &frames_data, std::ostream &out) {
-    std::map<FrameAddress, FrameWords> converted_frames;
+    absl::btree_map<FrameAddress, FrameWords> converted_frames;
     for (const auto &address_words_pair : frames_data) {
       converted_frames.emplace(address_words_pair.first,
                                address_words_pair.second);

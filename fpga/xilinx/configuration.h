@@ -14,10 +14,10 @@
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
-#include <map>
 #include <optional>
 #include <vector>
 
+#include "absl/container/btree_map.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "fpga/xilinx/arch-types.h"
@@ -38,7 +38,7 @@ class Configuration {
   static constexpr auto kWordsPerFrame = std::tuple_size_v<FrameWords>;
 
  public:
-  using FrameMap = std::map<FrameAddress, absl::Span<const uint32_t>>;
+  using FrameMap = absl::btree_map<FrameAddress, absl::Span<const uint32_t>>;
   using PacketData = std::vector<uint32_t>;
 
   // Returns a configuration, i.e. collection of frame addresses
@@ -59,7 +59,7 @@ class Configuration {
   // Returns the payload for a type 2 packet
   // which allows for bigger payload compared to type 1.
   static PacketData CreateType2ConfigurationPacketData(
-    const std::map<FrameAddress, FrameWords> &frames,
+    const absl::btree_map<FrameAddress, FrameWords> &frames,
     std::optional<Part> &part) {
     PacketData packet_data;
     // Certain configuration frames blocks are separated by Zero Frames,
@@ -83,7 +83,8 @@ class Configuration {
     return packet_data;
   }
 
-  Configuration(const Part &part, std::map<FrameAddress, FrameWords> &frames)
+  Configuration(const Part &part,
+                absl::btree_map<FrameAddress, FrameWords> &frames)
       : part_(part) {
     for (auto &frame : frames) {
       frames_[frame.first] = absl::Span<const uint32_t>(frame.second);
