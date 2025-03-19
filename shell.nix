@@ -34,6 +34,7 @@ pkgs.mkShell {
 
     # FPGA utils.
     openfpgaloader
+    verible
   ];
 
   CLANG_TIDY="${clang_for_tidy}/bin/clang-tidy";

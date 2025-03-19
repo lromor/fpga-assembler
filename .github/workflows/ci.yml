@@ -70,6 +70,25 @@ jobs:
           RUNNING_IN_CI=1 CLANG_FORMAT=clang-format-17 \
             scripts/run-clang-format.sh
 
+  VerilogFormatting:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Verible
+        uses: chipsalliance/verible-actions-common/install-verible@main
+        with:
+          verible_version: v0.0-3894-g0a842c85
+
+      - name: Run formatting style check
+        run: |
+          verible-verilog-format --version
+          RUNNING_IN_CI=1 VERIBLE_VERILOG_FORMAT=verible-verilog-format \
+            scripts/run-verible-verilog-format.sh
+
   ClangTidy:
     runs-on: ubuntu-24.04
     steps:
