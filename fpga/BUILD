@@ -63,18 +63,10 @@ cc_library(
     ],
 )
 
-filegroup(
-    name = "testdata",
-    srcs = glob(["testdata/*"]),
-)
-
 cc_test(
     name = "database-parsers_test",
     srcs = [
         "database-parsers_test.cc",
-    ],
-    data = [
-        "//fpga:testdata",
     ],
     deps = [
         ":database-parsers",
