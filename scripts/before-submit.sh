@@ -8,6 +8,7 @@ set -e
 
 . <(scripts/run-build-cleaner.sh ...)  # auto-repair issues
 scripts/run-clang-format.sh
+bazel build -c opt ...
 bazel test -c opt ...
 scripts/make-compilation-db.sh
 sh scripts/run-clang-tidy-cached.cc
