@@ -5,8 +5,8 @@
 
 This command-line tool converts [FASM][fasm-spec] files into bitstreams, simplifying the assembly of human-readable FPGA configurations into the binary formats needed to program various FPGAs.
 
-At this stage, it can generate a set of frames in the same manner as [fasm2frames](https://github.com/chipsalliance/f4pga-xc-fasm/blob/25dc605c9c0896204f0c3425b52a332034cf5e5c/xc_fasm/fasm2frames.py).
-It has been tested with the Artix-7 [counter example][counter-example], where it produces identical frames—at and a working bitstream at approximately 10 times the speed compared to the pure Python textX based parser implementation.
+At this stage, it wraps most of [fasm2frames](https://github.com/chipsalliance/f4pga-xc-fasm/blob/25dc605c9c0896204f0c3425b52a332034cf5e5c/xc_fasm/fasm2frames.py) and [xc7frames2bit](https://github.com/f4pga/prjxray/blob/faf9c774a340e39cf6802d009996ed6016e63521/tools/xc7frames2bit.cc) logic into a single binary.
+It has been tested with the Artix-7 [counter example][counter-example], where it produces identical frames and a working bitstream—at approximately 10 times the speed compared to the pure Python textX based parser implementation.
 
 ## Usage
 
