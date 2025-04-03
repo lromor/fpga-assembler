@@ -10,7 +10,7 @@ license(
     name = "license",
     package_name = "xilinx",
     license_kinds = [
-        "@rules_license//licenses/spdx:ISC"
+        "@rules_license//licenses/spdx:ISC",
     ],
 )
 
