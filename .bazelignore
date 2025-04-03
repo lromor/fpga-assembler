@@ -1,0 +1,3 @@
+# While using flakes, bazel might pickup the sources used 
+# as flake input stored in direnv and lead to a broken build.
+.direnv

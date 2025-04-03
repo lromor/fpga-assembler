@@ -10,7 +10,12 @@ It has been tested with the Artix-7 [counter example][counter-example], where it
 
 ## Usage
 
-First, install [Bazel][bazel] and ensure you have a basic C/C++ toolchain set up. Then run:
+First, install [Bazel][bazel] and ensure you have a basic C/C++ toolchain set up.
+
+> [!NOTE]
+> If you are using Nix or NixOS, ensure you have [flakes enabled][enable-flakes] and enter the development shell via `nix develop`.
+
+Then run:
 
 ```
 bazel run -c opt //fpga:fpga-as -- --prjxray_db_path=/some/path/prjxray-db/artix7 --part=xc7a35tcsg324-1 < /some/path.fasm > output.bit
@@ -66,3 +71,4 @@ Using this metadata, you can search the segbits database for the specific featur
 [bazel]: https://bazel.build/
 [counter-example]: https://github.com/chipsalliance/f4pga-examples/blob/13f11197b33dae1cde3bf146f317d63f0134eacf/xc7/counter_test/counter.v
 [open-fpga-loader]: https://github.com/trabucayre/openFPGALoader
+[enable-flakes]: https://nixos.wiki/wiki/Flakes#Enable_flakes_permanently_in_NixOS
