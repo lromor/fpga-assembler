@@ -9,7 +9,9 @@ package(
 license(
     name = "license",
     package_name = "xilinx",
-    license_kind = "@rules_license//licenses/spdx:ISC",
+    license_kinds = [
+        "@rules_license//licenses/spdx:ISC"
+    ],
 )
 
 cc_library(

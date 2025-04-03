@@ -9,7 +9,9 @@ package(
 license(
     name = "license",
     package_name = "fpga",
-    license_kind = "@rules_license//licenses/spdx:Apache-2.0",
+    license_kinds = [
+        "@rules_license//licenses/spdx:Apache-2.0",
+    ],
 )
 
 cc_library(
