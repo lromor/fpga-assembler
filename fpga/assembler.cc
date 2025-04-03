@@ -1,6 +1,7 @@
 #include <sys/types.h>
 
 #include <array>
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -21,7 +22,6 @@
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "fpga/database-parsers.h"
@@ -301,13 +301,12 @@ If not present, it must be provided via PRJXRAY_DB_PATH.)");
 ABSL_FLAG(std::string, part, "", R"(FPGA part name, e.g. "xc7a35tcsg324-1".)");
 
 static inline std::string Usage(std::string_view name) {
-  return absl::StrCat("usage: ", name,
-                      " [options] < input.fasm > output.frm\n"
-                      R"(
-fpga parses a sequence of fasm lines and assembles them
-into a set of frames to be mapped into bitstream.
-Output is written to stdout.
-)");
+  return absl::StrFormat(R"(usage: %s [options] < input.fasm > output.bit
+
+This tool parses a sequence of fasm lines and assemble them
+into a set of frames then mapped into bitstream.
+Output is written to stdout.)",
+                         name);
 }
 
 static std::string StatusToErrorMessage(std::string_view message,
@@ -380,6 +379,7 @@ int main(int argc, char *argv[]) {
   const auto args_count = args.size();
   if (args_count > 2) {
     std::cerr << absl::ProgramUsageMessage() << '\n';
+    return 1;
   }
   const absl::StatusOr<std::string> prjxray_db_path_result =
     GetOptFlagOrFromEnv(FLAGS_prjxray_db_path, "PRJXRAY_DB_PATH");
@@ -422,6 +422,11 @@ int main(int argc, char *argv[]) {
     const std::string_view arg(args[1]);
     if (arg != "-") {
       input_stream = std::fopen(args[1], "r");
+      if (input_stream == nullptr) {
+        std::cerr << absl::ErrnoToStatus(errno, "cannot open fasm file")
+                  << "\n";
+        return 1;
+      }
     }
   }
   fpga::Frames frames;
