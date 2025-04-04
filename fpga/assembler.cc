@@ -303,7 +303,7 @@ ABSL_FLAG(std::string, part, "", R"(FPGA part name, e.g. "xc7a35tcsg324-1".)");
 static inline std::string Usage(std::string_view name) {
   return absl::StrFormat(R"(usage: %s [options] < input.fasm > output.bit
 
-This tool parses a sequence of fasm lines and assemble them
+This tool parses a sequence of fasm lines and assembles them
 into a set of frames then mapped into bitstream.
 Output is written to stdout.)",
                          name);
