@@ -6,8 +6,14 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils } @inputs:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }@inputs:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs {
           inherit system;
@@ -16,7 +22,8 @@
           bazel = bazel_7;
           jdk = jdk;
         };
-      in {
+      in
+      {
         devShells.default =
           let
             # There is too much volatility between even micro-versions of
@@ -25,7 +32,9 @@
 
             # clang tidy: use latest.
             clang_for_tidy = pkgs.llvmPackages_18.clang-tools;
-          in with pkgs; pkgs.mkShell{
+          in
+          with pkgs;
+          pkgs.mkShell {
             packages = with pkgs; [
               git
               common.bazel
@@ -51,8 +60,8 @@
               openfpgaloader
             ];
 
-            CLANG_TIDY="${clang_for_tidy}/bin/clang-tidy";
-            CLANG_FORMAT="${clang_for_formatting}/bin/clang-format";
+            CLANG_TIDY = "${clang_for_tidy}/bin/clang-tidy";
+            CLANG_FORMAT = "${clang_for_formatting}/bin/clang-format";
 
             shellHook = ''
               exec bash
@@ -60,29 +69,30 @@
           };
 
         # Package fpga-assembler.
-        packages.default = (pkgs.callPackage (
-          {
-            buildBazelPackage,
-            stdenv,
-            fetchFromGitHub,
-            lib,
-            nix-gitignore,
-          }:
-          let
-            system = stdenv.hostPlatform.system;
-            registry = fetchFromGitHub {
-              owner = "bazelbuild";
-              repo = "bazel-central-registry";
-              rev = "63f3af762b2fdd7acaa7987856cd3ac314eaea09";
-              hash = "sha256-ugNzoP0gdrhl9vH1TRdwoevuTsSqjitXnAoMSSTlCgI=";
-            };
-          in
+        packages.default =
+          (pkgs.callPackage (
+            {
+              buildBazelPackage,
+              stdenv,
+              fetchFromGitHub,
+              lib,
+              nix-gitignore,
+            }:
+            let
+              system = stdenv.hostPlatform.system;
+              registry = fetchFromGitHub {
+                owner = "bazelbuild";
+                repo = "bazel-central-registry";
+                rev = "63f3af762b2fdd7acaa7987856cd3ac314eaea09";
+                hash = "sha256-ugNzoP0gdrhl9vH1TRdwoevuTsSqjitXnAoMSSTlCgI=";
+              };
+            in
             buildBazelPackage {
               pname = "fpga-as";
 
               version = "0.0.1";
 
-              src = nix-gitignore.gitignoreSourcePure [] ./.;
+              src = nix-gitignore.gitignoreSourcePure [ ] ./.;
 
               bazelFlags = [
                 "--registry"
@@ -99,7 +109,7 @@
                     aarch64-linux = "sha256-E4VHjDa0qkHmKUNpTBfJi7dhMLcd1z5he+p31/XvUl8=";
                     x86_64-linux = "sha256-hVBJB0Hsd9sXuEoNcjhTkbPl89vlZT1w39JppCD+n8Y=";
                   }
-                    .${system} or (throw "No hash for system: ${system}");
+                  .${system} or (throw "No hash for system: ${system}");
               };
 
               removeRulesCC = false;
@@ -133,15 +143,22 @@
                 platforms = lib.platforms.linux;
               };
             }
-        ) {}).overrideAttrs (final: prev: {
-          # Fixup the deps so they always contain correrct
-          # shebangs paths pointing to the store.
-          deps = prev.deps.overrideAttrs (final: prev: {
-            installPhase = ''
-              patchShebangs $bazelOut/external
-            '' + prev.installPhase;
-          });
-        });
+          ) { }).overrideAttrs
+            (
+              final: prev: {
+                # Fixup the deps so they always contain correrct
+                # shebangs paths pointing to the store.
+                deps = prev.deps.overrideAttrs (
+                  final: prev: {
+                    installPhase =
+                      ''
+                        patchShebangs $bazelOut/external
+                      ''
+                      + prev.installPhase;
+                  }
+                );
+              }
+            );
       }
     );
 }
