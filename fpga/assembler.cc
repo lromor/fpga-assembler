@@ -110,7 +110,7 @@ static absl::Status ProcessFasmFeatures(
     // Select only bit addresses with value bit set to 1.
     for (int addr = 0; addr < tile_feature.width; ++addr) {
       const unsigned feature_addr = (addr + tile_feature.start_bit);
-      const bool value = bits & (1 << feature_addr);
+      const bool value = bits & (uint64_t(1) << addr);
       if (value) {
         db.ConfigBits(
           tile_name, feature, feature_addr,
