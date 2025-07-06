@@ -4,13 +4,7 @@ module(
 )
 
 # Bazel C/C++ language rules and deps.
-bazel_dep(name = "rules_cc", version = "0.0.16")
-git_override(
-    module_name = "rules_cc",
-    commit = "d74915024017250e46d95e91a3defc34174effe0",
-    remote = "https://github.com/bazelbuild/rules_cc",
-)
-
+bazel_dep(name = "rules_cc", version = "0.1.2")
 bazel_dep(name = "abseil-cpp", version = "20240722.0.bcr.2")
 bazel_dep(name = "googletest", version = "1.15.2")
 bazel_dep(name = "rapidjson", version = "1.1.0.bcr.20241007")
