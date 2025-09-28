@@ -2,163 +2,183 @@
   description = "fpga-assembler";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/2c8d3f48d33929642c1c12cd243df4cc7d2ce434";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/e643668fd71b949c53f8626614b21ff71a07379d";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+  };
+
+  nixConfig = {
+    extra-substituters = [
+      "https://fpga-assembler.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "fpga-assembler.cachix.org-1:yp4kNzY1Hru9BlaoE025RuBaL/sX6Ou2abo5L8SHk0I="
+    ];
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-    }@inputs:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-        };
-        common = with pkgs; {
-          bazel = bazel_7;
-          jdk = jdk;
-        };
-      in
+    inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake
       {
-        devShells.default =
-          let
-            # There is too much volatility between even micro-versions of
-            # newer clang-format. Use slightly older version for now.
-            clang_for_formatting = pkgs.llvmPackages_17.clang-tools;
+        inherit inputs;
+      }
+      {
+        imports = [
+          inputs.treefmt-nix.flakeModule
+        ];
 
-            # clang tidy: use latest.
-            clang_for_tidy = pkgs.llvmPackages_18.clang-tools;
-          in
-          with pkgs;
-          pkgs.mkShell {
-            packages = with pkgs; [
-              git
-              common.bazel
-              common.jdk
-              bash
-              gdb
+        systems = [
+          "aarch64-darwin"
+          "aarch64-linux"
+          "x86_64-darwin"
+          "x86_64-linux"
+        ];
 
-              # For clang-tidy and clang-format.
-              clang_for_formatting
-              clang_for_tidy
+        perSystem =
+          { pkgs, system, ... }:
+          {
+            treefmt = {
+              projectRootFile = "flake.nix";
+              programs.yamlfmt.enable = true;
+              programs.nixfmt.enable = true;
+            };
+            devShells.default =
+              let
+                # There is too much volatility between even micro-versions of
+                # newer clang-format. Use slightly older version for now.
+                clang_for_formatting = pkgs.llvmPackages_17.clang-tools;
 
-              # For buildifier, buildozer.
-              bazel-buildtools
-              bant
+                # clang tidy: use latest.
+                clang_for_tidy = pkgs.llvmPackages_18.clang-tools;
+              in
+              with pkgs;
+              pkgs.mkShell {
+                packages = with pkgs; [
+                  git
+                  bazel_7
+                  jdk
+                  bash
+                  gdb
 
-              # Profiling and sanitizers.
-              linuxPackages_latest.perf
-              pprof
-              perf_data_converter
-              valgrind
+                  # For clang-tidy and clang-format.
+                  clang_for_formatting
+                  clang_for_tidy
 
-              # FPGA utils.
-              openfpgaloader
-            ];
+                  # For buildifier, buildozer.
+                  bazel-buildtools
+                  bant
 
-            CLANG_TIDY = "${clang_for_tidy}/bin/clang-tidy";
-            CLANG_FORMAT = "${clang_for_formatting}/bin/clang-format";
+                  # Profiling and sanitizers.
+                  linuxPackages_latest.perf
+                  pprof
+                  perf_data_converter
+                  valgrind
 
-            shellHook = ''
-              exec bash
-            '';
-          };
+                  # FPGA utils.
+                  openfpgaloader
+                ];
 
-        # Package fpga-assembler.
-        packages.default =
-          (pkgs.callPackage (
-            {
-              buildBazelPackage,
-              stdenv,
-              fetchFromGitHub,
-              lib,
-              nix-gitignore,
-            }:
-            let
-              system = stdenv.hostPlatform.system;
-              registry = fetchFromGitHub {
-                owner = "bazelbuild";
-                repo = "bazel-central-registry";
-                rev = "63f3af762b2fdd7acaa7987856cd3ac314eaea09";
-                hash = "sha256-ugNzoP0gdrhl9vH1TRdwoevuTsSqjitXnAoMSSTlCgI=";
-              };
-            in
-            buildBazelPackage {
-              pname = "fpga-as";
+                CLANG_TIDY = "${clang_for_tidy}/bin/clang-tidy";
+                CLANG_FORMAT = "${clang_for_formatting}/bin/clang-format";
 
-              version = "0.0.1";
-
-              src = nix-gitignore.gitignoreSourcePure [ ] ./.;
-
-              bazelFlags = [
-                "--registry"
-                "file://${registry}"
-              ];
-
-              postPatch = ''
-                patchShebangs scripts/create-workspace-status.sh
-              '';
-
-              fetchAttrs = {
-                hash =
-                  {
-                    aarch64-linux = "sha256-E4VHjDa0qkHmKUNpTBfJi7dhMLcd1z5he+p31/XvUl8=";
-                    x86_64-linux = "sha256-hVBJB0Hsd9sXuEoNcjhTkbPl89vlZT1w39JppCD+n8Y=";
-                  }
-                  .${system} or (throw "No hash for system: ${system}");
-              };
-
-              removeRulesCC = false;
-              removeLocalConfigCc = false;
-              removeLocalConfigSh = false;
-
-              nativeBuildInputs = [
-                common.jdk
-                pkgs.git
-                pkgs.bash
-                # Convenient tool to enter into the sandbox and start debugging.
-                pkgs.breakpointHook
-              ];
-
-              bazel = common.bazel;
-
-              bazelBuildFlags = [ "-c opt" ];
-              bazelTestTargets = [ "//..." ];
-              bazelTargets = [ "//fpga:fpga-as" ];
-
-              buildAttrs = {
-                installPhase = ''
-                  install -D --strip bazel-bin/fpga/fpga-as "$out/bin/fpga-as"
+                shellHook = ''
+                  exec bash
                 '';
               };
 
-              meta = {
-                description = "Tool to convert FASM to FPGA bitstream.";
-                homepage = "https://github.com/lromor/fpga-assembler";
-                license = lib.licenses.asl20;
-                platforms = lib.platforms.linux;
-              };
-            }
-          ) { }).overrideAttrs
-            (
-              final: prev: {
-                # Fixup the deps so they always contain correrct
-                # shebangs paths pointing to the store.
-                deps = prev.deps.overrideAttrs (
+            # Package fpga-assembler.
+            packages.default =
+              (pkgs.callPackage (
+                {
+                  buildBazelPackage,
+                  stdenv,
+                  fetchFromGitHub,
+                  lib,
+                  nix-gitignore,
+                }:
+                let
+                  system = stdenv.hostPlatform.system;
+                  registry = fetchFromGitHub {
+                    owner = "bazelbuild";
+                    repo = "bazel-central-registry";
+                    rev = "c0249a798b9f367d0844c73c4c310350b0b15ade";
+                    hash = "sha256-vSs4XMe3wnfS8G7kj561rVgUqmpMLuL3qN+X21LFqy8=";
+                  };
+                in
+                with pkgs;
+                buildBazelPackage {
+                  pname = "fpga-as";
+
+                  version = "0.0.1";
+
+                  src = nix-gitignore.gitignoreSourcePure [ ] ./.;
+
+                  bazelFlags = [
+                    "--registry"
+                    "file://${registry}"
+                  ];
+
+                  postPatch = ''
+                    patchShebangs scripts/create-workspace-status.sh
+                  '';
+
+                  fetchAttrs = {
+                    hash =
+                      {
+                        aarch64-linux = "sha256-E4VHjDa0qkHmKUNpTBfJi7dhMLcd1z5he+p31/XvUl8=";
+                        x86_64-linux = "sha256-9jvyo0qlzPHYvs/Uou5j0bUU3oq/SPVDAq9ydlOBr2k=";
+                      }
+                      .${system} or (throw "No hash for system: ${system}");
+                  };
+
+                  removeRulesCC = false;
+                  removeLocalConfigCc = false;
+                  removeLocalConfigSh = false;
+
+                  nativeBuildInputs = [
+                    jdk
+                    git
+                    bash
+                    # Convenient tool to enter into the sandbox and start debugging.
+                    # breakpointHook
+                  ];
+
+                  bazel = bazel_7;
+
+                  bazelBuildFlags = [ "-c opt" ];
+                  bazelTestTargets = [ "//..." ];
+                  bazelTargets = [ "//fpga:fpga-as" ];
+
+                  buildAttrs = {
+                    installPhase = ''
+                      install -D --strip bazel-bin/fpga/fpga-as "$out/bin/fpga-as"
+                    '';
+                  };
+
+                  meta = {
+                    description = "Tool to convert FASM to FPGA bitstream.";
+                    homepage = "https://github.com/lromor/fpga-assembler";
+                    license = lib.licenses.asl20;
+                    platforms = lib.platforms.linux;
+                  };
+                }
+              ) { }).overrideAttrs
+                (
                   final: prev: {
-                    installPhase =
-                      ''
-                        patchShebangs $bazelOut/external
-                      ''
-                      + prev.installPhase;
+                    # Fixup the deps so they always contain correrct
+                    # shebangs paths pointing to the store.
+                    deps = prev.deps.overrideAttrs (
+                      final: prev: {
+                        installPhase =
+                          ''
+                            patchShebangs $bazelOut/external
+                          ''
+                          + prev.installPhase;
+                      }
+                    );
                   }
                 );
-              }
-            );
-      }
-    );
+          };
+      };
 }

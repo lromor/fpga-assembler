@@ -68,3 +68,7 @@ node_modules
 
 # production
 /build
+
+# Nix
+result
+result-*
