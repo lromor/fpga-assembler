@@ -44,17 +44,9 @@
               programs.nixfmt.enable = true;
             };
             devShells.default =
-              let
-                # There is too much volatility between even micro-versions of
-                # newer clang-format. Use slightly older version for now.
-                clang_for_formatting = pkgs.llvmPackages_17.clang-tools;
-
-                # clang tidy: use latest.
-                clang_for_tidy = pkgs.llvmPackages_18.clang-tools;
-              in
               with pkgs;
-              pkgs.mkShell {
-                packages = with pkgs; [
+              mkShell {
+                packages = [
                   git
                   bazel_7
                   jdk
@@ -62,15 +54,14 @@
                   gdb
 
                   # For clang-tidy and clang-format.
-                  clang_for_formatting
-                  clang_for_tidy
+                  clang-tools
 
                   # For buildifier, buildozer.
                   bazel-buildtools
                   bant
 
                   # Profiling and sanitizers.
-                  linuxPackages_latest.perf
+                  perf
                   pprof
                   perf_data_converter
                   valgrind
@@ -79,12 +70,8 @@
                   openfpgaloader
                 ];
 
-                CLANG_TIDY = "${clang_for_tidy}/bin/clang-tidy";
-                CLANG_FORMAT = "${clang_for_formatting}/bin/clang-format";
-
-                shellHook = ''
-                  exec bash
-                '';
+                CLANG_TIDY = "${clang-tools}/bin/clang-tidy";
+                CLANG_FORMAT = "${clang-tools}/bin/clang-format";
               };
 
             # Package fpga-assembler.
@@ -170,11 +157,10 @@
                     # shebangs paths pointing to the store.
                     deps = prev.deps.overrideAttrs (
                       final: prev: {
-                        installPhase =
-                          ''
-                            patchShebangs $bazelOut/external
-                          ''
-                          + prev.installPhase;
+                        installPhase = ''
+                          patchShebangs $bazelOut/external
+                        ''
+                        + prev.installPhase;
                       }
                     );
                   }
