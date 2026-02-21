@@ -360,6 +360,7 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(std::string_view database_path,
 void PartDatabase::ConfigBits(const std::string &tile_name,
                               const std::string &feature, uint32_t address,
                               const BitSetter &bit_setter) {
+  // fprintf(stderr, "%s %s %u\n", tile_name.c_str(), feature.c_str(), address);
   // Given the tilename, get the tile type.
   const Tile &tile = tiles_->grid.at(tile_name);
   // Either the feature tile type of the tile type alias.
@@ -422,6 +423,7 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
   }
 
   // The tile name has some specific config bus base addresses.
+  bool matched = false;
   for (const auto &config_bus_bits_pair : aliased_bits_map) {
     const ConfigBusType &bus = config_bus_bits_pair.first;
     const uint32_t base_address = config_bus_bits_pair.second.base_address;
@@ -431,7 +433,12 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
     }
     const SegmentsBits &features_segbits =
       tile_type_features_bits.segment_bits.at(bus);
+    if (aliased_bits_map.size() > 1 && !features_segbits.count(tile_feature)) {
+      // a feature will probably only match one bus (e.g. BRAM init or BRAM config/routing)
+      continue;
+    }
     const auto &segbits = features_segbits.at(tile_feature);
+    matched = true;
     for (const auto &segbit : segbits) {
       const uint32_t address = base_address + segbit.word_column;
       const uint32_t bit_pos = offset * kWordSizeBits + segbit.word_bit;
@@ -442,5 +449,6 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
       bit_setter(bus, address, frame_bit, segbit.is_set);
     }
   }
+  CHECK(matched);
 }
 }  // namespace fpga
