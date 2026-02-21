@@ -389,7 +389,7 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
         .alias = {},
         .base_address = bits_block.base_address,
         .frames = bits_block.frames,
-        .offset = bits_block.offset - alias.start_offset,
+        .offset = int32_t(bits_block.offset - alias.start_offset),
         .words = bits_block.words,
       };
       aliased_bits_map.insert({bus_type, aliased_block});

@@ -197,7 +197,7 @@ inline absl::StatusOr<BitsBlock> Unmarshal(const rapidjson::Value &json) {
                    ParseBaseAddress(GetMember<std::string>(json, "baseaddr")));
 
   ASSIGN_OR_RETURN(bits_block.frames, GetMember<uint32_t>(json, "frames"));
-  ASSIGN_OR_RETURN(bits_block.offset, GetMember<uint32_t>(json, "offset"));
+  ASSIGN_OR_RETURN(bits_block.offset, GetMember<int32_t>(json, "offset"));
   ASSIGN_OR_RETURN(bits_block.words, GetMember<uint32_t>(json, "words"));
   return bits_block;
 }
