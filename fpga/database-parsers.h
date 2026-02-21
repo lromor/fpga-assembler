@@ -34,7 +34,7 @@ struct BitsBlock {
   std::optional<BitsBlockAlias> alias;
   bits_addr_t base_address;
   uint32_t frames;
-  uint32_t offset;
+  int32_t offset;
   uint32_t words;
 };
 
