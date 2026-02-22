@@ -47,7 +47,7 @@ class BigEndianSpan {
    protected:
     friend class BigEndianSpan<WordType, ByteType>;
 
-    explicit value_type(absl::Span<ByteType> bytes) : bytes_(bytes){};
+    explicit value_type(absl::Span<ByteType> bytes) : bytes_(bytes) {};
 
    private:
     absl::Span<ByteType> bytes_;
@@ -78,7 +78,7 @@ class BigEndianSpan {
    protected:
     friend class BigEndianSpan<WordType, ByteType>;
 
-    explicit iterator(absl::Span<ByteType> bytes) : bytes_(bytes){};
+    explicit iterator(absl::Span<ByteType> bytes) : bytes_(bytes) {};
 
    private:
     absl::Span<ByteType> bytes_;
@@ -87,7 +87,7 @@ class BigEndianSpan {
   using pointer = value_type *;
   using reference = value_type &;
 
-  explicit BigEndianSpan(absl::Span<ByteType> bytes) : bytes_(bytes){};
+  explicit BigEndianSpan(absl::Span<ByteType> bytes) : bytes_(bytes) {};
 
   constexpr size_type size() const noexcept {
     return bytes_.size() / kBytesPerElement;

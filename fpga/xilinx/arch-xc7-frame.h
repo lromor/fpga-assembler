@@ -69,7 +69,7 @@ class FrameAddress {
     value_ = bit_field_set(value_, 16, 7, column);
     value_ = bit_field_set(value_, 6, 0, minor);
   }
-  explicit FrameAddress(uint32_t value) : value_(value){};
+  explicit FrameAddress(uint32_t value) : value_(value) {};
   auto operator<=>(const FrameAddress &o) const = default;
 
   BlockType block_type() const {

@@ -146,11 +146,11 @@ using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
   ++it
 
 // Parse number with given base (any base between 2 and 16 is supported)
-#define fasm_parse_number_with_base(v, base)                                 \
-  fasm_skip_blank();                                                         \
-  for (int8_t d; (d = internal::kDigitToInt[(uint8_t) * it]) < (base); ++it) \
-    if (d == internal::kDigitSeparator) {                                    \
-    } else                                                                   \
+#define fasm_parse_number_with_base(v, base)                               \
+  fasm_skip_blank();                                                       \
+  for (int8_t d; (d = internal::kDigitToInt[(uint8_t)*it]) < (base); ++it) \
+    if (d == internal::kDigitSeparator) {                                  \
+    } else                                                                 \
       (v) = (v) * (base) + d
 
 inline ParseResult Parse(std::string_view content, FILE *errstream,
