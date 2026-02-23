@@ -127,14 +127,6 @@ void ValueParseTest() {
     {"BRACKET_MISSING[4:0xyz", ParseResult::kError,  //
      "", 0, 0, 0},                                   // Callback never called
 
-    // Numbers longer than 64 bit can not be dealt with, only best effort
-    // parse
-    {"VERY_LONG_NOT_SUPPORTED[255:0] = 256'h1", ParseResult::kError,
-     "VERY_LONG_NOT_SUPPORTED", 0, 64, 1},  // Short enough to parse complete
-    {"BEST_EFFORT[127:0] = 128'hdeadbeef_deadbeef_c0feface_1337f00d",
-     ParseResult::kError,                        //
-     "BEST_EFFORT", 0, 64, 0xc0feface1337f00d},  // Truncated
-
     // Examples from README.
     {"FOO[255:192] = 42", ParseResult::kSuccess, "FOO", 192, 64, 42},
     {"BAR[255:0] = 42", ParseResult::kError, "BAR", 0, 64, 42},
@@ -178,6 +170,57 @@ void ValueParseTest() {
       // If the expected the callback to be called, the expect data will have
       // a width != 0.
       EXPECT_EQ(was_called, (expected.width != 0)) << expected.input << "\n";
+    }
+  }
+}
+
+struct LongValueTestCase {
+  std::string_view input;
+  // Expected outputs
+  fasm::ParseResult result;
+  std::string_view feature_name;
+  struct Chunk {
+    int min_bit;
+    int width;
+    uint64_t bits;
+  };
+  std::vector<Chunk> chunks;
+};
+
+void LongValueParseTest() {
+  std::cout << "\n-- Value parse test -- \n";
+  const LongValueTestCase tests[] = {
+    // Names
+
+    {"ASSIGN_LONG[191:0] = 192'h0123456789ABCDEFDEADBEEFDEADBEEFAABBCCDDEEFF0011", ParseResult::kSuccess,  //
+     "ASSIGN_LONG", {
+        {0,   64, 0xAABBCCDDEEFF0011UL},
+        {64,  64, 0xDEADBEEFDEADBEEFUL},
+        {128, 64, 0x0123456789ABCDEFUL},
+    }},
+  };
+
+  for (const LongValueTestCase &expected : tests) {
+    for (const char *line_ending : {"\n", "\r\n"}) {
+      const std::string line = std::string(expected.input);
+      const std::string input = line + line_ending;
+      size_t i = 0;
+      auto result = fasm::Parse(
+        input, stderr,
+        [&](uint32_t, std::string_view n, int min_bit, int width,
+            uint64_t bits) {
+          EXPECT_EQ(n, expected.feature_name) << expected.input << "\n";
+          EXPECT_EQ(min_bit, expected.chunks[i].min_bit) << expected.input << "\n";
+          EXPECT_EQ(width, expected.chunks[i].width) << expected.input << "\n";
+          EXPECT_EQ(bits, expected.chunks[i].bits) << expected.input << "\n";
+          i++;
+          return true;
+        });
+
+      EXPECT_EQ(result, expected.result) << expected.input << "\n";
+      // If the expected the callback to be called, the expect data will have
+      // a width != 0.
+      EXPECT_EQ(i, expected.chunks.size()) << expected.input << "\n";
     }
   }
 }
@@ -252,6 +295,7 @@ void AnnotationParseTest() {
 int main() {
   ValueParseTest();
   AnnotationParseTest();
+  LongValueParseTest();
 
   if (expect_mismatch_count == 0) {
     printf("\nPASS, all expectations met.\n");

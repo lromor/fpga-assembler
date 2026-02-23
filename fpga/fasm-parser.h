@@ -166,6 +166,7 @@ using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
         n += l2base;                                                                  \
       }                                                                               \
   }                                                                                   \
+  if (v.empty()) v.emplace_back();                                                    \
   std::reverse(v.begin(), v.end());
 
 
@@ -243,7 +244,6 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
         fasm_skip_blank();
         uint64_t value_or_width = 0;
         if (internal::kDigitToInt[(uint8_t)*it] <= 9) {
-          bitset.emplace_back();
           fasm_parse_number_with_base(value_or_width, 10);  // width or decimal value
         }
         fasm_skip_blank();
@@ -268,7 +268,7 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
             // TODO: if this is needed in practice, then parse in multiple
             // steps and call back multiple times with parts of the number.
             fprintf(errstream,
-                    "%u: ERR: Sorry, can only deal with ranges <= 64 bit currently "
+                    "%u: ERR: Sorry, can only deal with ranges <= 64 bit currently for integers "
                     "%.*s[%d:%d]; trimming width %u to 64\n",
                     line_number, (int)feature.size(), feature.data(), max_bit,
                     min_bit, width);
@@ -294,6 +294,16 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
           }
           fasm_skip_blank();
         } else {
+          if (fasm_unlikely(width > 64)) {
+            fprintf(errstream,
+                    "%u: ERR: Sorry, can only deal with ranges <= 64 bit currently for integers "
+                    "%.*s[%d:%d]; trimming width %u to 64\n",
+                    line_number, (int)feature.size(), feature.data(), max_bit,
+                    min_bit, width);
+            result = ParseResult::kError;
+            width = 64;  // Clamp number of bits we report.
+            // Move foward, doing best effort parsing of lower 64 bits.
+          }
           bitset.push_back(value_or_width);
         }
       } else {
@@ -311,7 +321,7 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
       for (unsigned chunk = 0; chunk < bitset.size(); chunk++) {
         auto value = bitset.at(chunk);
         unsigned value_width = 64;
-        if (chunk == bitset.size()) {
+        if (chunk == (bitset.size() - 1)) {
           value_width = unsigned(width - 64 * (bitset.size() - 1));
         }
         value &= uint64_t(-1) >> (64 - value_width);  // Clamp bits if value too wide
