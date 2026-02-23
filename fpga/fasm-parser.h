@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <functional>
 #include <string_view>
+#include <vector>
 
 namespace fasm {
 // Parse callback for FASM lines. The "feature" found in line number "line"
@@ -154,21 +155,21 @@ using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
       (v) = (v) * (base) + d
 
 // Parse big number with given power-of-2 base
-#define fasm_parse_long_number_with_base(v, l2base)                           \
-  fasm_skip_blank();                                                          \
-  {                                                                           \
-    unsigned n = 0;                                                           \
-    for (int8_t d; (d = internal::kDigitToInt[(uint8_t)*it]) < (1 << l2base); \
-         ++it)                                                                \
-      if (d == internal::kDigitSeparator) {                                   \
-      } else {                                                                \
-        if ((n % 64) == 0) v.emplace_back();                                  \
-        (v).back() = (v).back() * (1 << l2base) + d;                          \
-        n += l2base;                                                          \
-      }                                                                       \
-  }                                                                           \
-  if (v.empty()) v.emplace_back();                                            \
-  std::reverse(v.begin(), v.end());
+#define fasm_parse_long_number_with_base(v, l2base)                         \
+  fasm_skip_blank();                                                        \
+  {                                                                         \
+    unsigned n = 0;                                                         \
+    for (int8_t d;                                                          \
+         (d = internal::kDigitToInt[(uint8_t)*it]) < (1 << (l2base)); ++it) \
+      if (d == internal::kDigitSeparator) {                                 \
+      } else {                                                              \
+        if ((n % 64) == 0) (v).emplace_back();                              \
+        (v).back() = (v).back() * (1 << (l2base)) + d;                      \
+        n += (l2base);                                                      \
+      }                                                                     \
+  }                                                                         \
+  if ((v).empty()) (v).emplace_back();                                      \
+  std::reverse((v).begin(), (v).end());
 
 inline ParseResult Parse(std::string_view content, FILE *errstream,
                          const ParseCallback &parse_callback,
