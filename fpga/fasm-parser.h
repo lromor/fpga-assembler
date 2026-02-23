@@ -154,21 +154,21 @@ using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
       (v) = (v) * (base) + d
 
 // Parse big number with given power-of-2 base
-#define fasm_parse_long_number_with_base(v, l2base)                                   \
-  fasm_skip_blank();                                                                  \
-  {                                                                                   \
-    unsigned n = 0;                                                                   \
-    for (int8_t d; (d = internal::kDigitToInt[(uint8_t) * it]) < (1 << l2base); ++it) \
-      if (d == internal::kDigitSeparator) {                                           \
-      } else {                                                                        \
-        if ((n % 64) == 0) v.emplace_back();                                          \
-        (v).back() = (v).back() * (1 << l2base) + d;                                  \
-        n += l2base;                                                                  \
-      }                                                                               \
-  }                                                                                   \
-  if (v.empty()) v.emplace_back();                                                    \
+#define fasm_parse_long_number_with_base(v, l2base)                           \
+  fasm_skip_blank();                                                          \
+  {                                                                           \
+    unsigned n = 0;                                                           \
+    for (int8_t d; (d = internal::kDigitToInt[(uint8_t)*it]) < (1 << l2base); \
+         ++it)                                                                \
+      if (d == internal::kDigitSeparator) {                                   \
+      } else {                                                                \
+        if ((n % 64) == 0) v.emplace_back();                                  \
+        (v).back() = (v).back() * (1 << l2base) + d;                          \
+        n += l2base;                                                          \
+      }                                                                       \
+  }                                                                           \
+  if (v.empty()) v.emplace_back();                                            \
   std::reverse(v.begin(), v.end());
-
 
 inline ParseResult Parse(std::string_view content, FILE *errstream,
                          const ParseCallback &parse_callback,
@@ -244,7 +244,8 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
         fasm_skip_blank();
         uint64_t value_or_width = 0;
         if (internal::kDigitToInt[(uint8_t)*it] <= 9) {
-          fasm_parse_number_with_base(value_or_width, 10);  // width or decimal value
+          fasm_parse_number_with_base(value_or_width,
+                                      10);  // width or decimal value
         }
         fasm_skip_blank();
         if (*it == '\'') {
@@ -257,18 +258,20 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
                     "%u: WARN Attempt to assign more bits (%" PRIu64
                     "') for "
                     "%.*s[%d:%d] with supported bit width of %u\n",
-                    line_number, value_or_width, (int)feature.size(), feature.data(),
-                    max_bit, min_bit, width);
+                    line_number, value_or_width, (int)feature.size(),
+                    feature.data(), max_bit, min_bit, width);
             result = std::max(result, ParseResult::kNonCritical);
           }
           const char format_type = *it;
           ++it;
 
-          if (fasm_unlikely(width > 64) && (format_type == 'd' || format_type == 'o')) {
+          if (fasm_unlikely(width > 64) &&
+              (format_type == 'd' || format_type == 'o')) {
             // TODO: if this is needed in practice, then parse in multiple
             // steps and call back multiple times with parts of the number.
             fprintf(errstream,
-                    "%u: ERR: Sorry, can only deal with ranges <= 64 bit currently for integers "
+                    "%u: ERR: Sorry, can only deal with ranges <= 64 bit "
+                    "currently for integers "
                     "%.*s[%d:%d]; trimming width %u to 64\n",
                     line_number, (int)feature.size(), feature.data(), max_bit,
                     min_bit, width);
@@ -280,8 +283,14 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
           switch (format_type) {
           case 'h': fasm_parse_long_number_with_base(bitset, 4); break;
           case 'b': fasm_parse_long_number_with_base(bitset, 1); break;
-          case 'o': bitset.emplace_back(); fasm_parse_number_with_base(bitset[0], 8); break;
-          case 'd': bitset.emplace_back(); fasm_parse_number_with_base(bitset[0], 10); break;
+          case 'o':
+            bitset.emplace_back();
+            fasm_parse_number_with_base(bitset[0], 8);
+            break;
+          case 'd':
+            bitset.emplace_back();
+            fasm_parse_number_with_base(bitset[0], 10);
+            break;
           default:
             fprintf(errstream,
                     "%u: unknown base signifier '%c'; expected "
@@ -289,14 +298,16 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
                     line_number, format_type);
             result = ParseResult::kError;
             fasm_skip_to_eol();
-            bitset.push_back(0x01);  // In error state now, but report this feature as set
+            bitset.push_back(
+              0x01);  // In error state now, but report this feature as set
             break;
           }
           fasm_skip_blank();
         } else {
           if (fasm_unlikely(width > 64)) {
             fprintf(errstream,
-                    "%u: ERR: Sorry, can only deal with ranges <= 64 bit currently for integers "
+                    "%u: ERR: Sorry, can only deal with ranges <= 64 bit "
+                    "currently for integers "
                     "%.*s[%d:%d]; trimming width %u to 64\n",
                     line_number, (int)feature.size(), feature.data(), max_bit,
                     min_bit, width);
@@ -324,9 +335,11 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
         if (chunk == (bitset.size() - 1)) {
           value_width = unsigned(width - 64 * (bitset.size() - 1));
         }
-        value &= uint64_t(-1) >> (64 - value_width);  // Clamp bits if value too wide
-        if (fasm_unlikely(
-              !parse_callback(line_number, feature, min_bit + chunk * 64, value_width, value))) {
+        value &=
+          uint64_t(-1) >> (64 - value_width);  // Clamp bits if value too wide
+        if (fasm_unlikely(!parse_callback(line_number, feature,
+                                          min_bit + chunk * 64, value_width,
+                                          value))) {
           result = std::max(result, ParseResult::kUserAbort);
           break;
         }

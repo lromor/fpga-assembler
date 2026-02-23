@@ -434,7 +434,8 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
     const SegmentsBits &features_segbits =
       tile_type_features_bits.segment_bits.at(bus);
     if (aliased_bits_map.size() > 1 && !features_segbits.count(tile_feature)) {
-      // a feature will probably only match one bus (e.g. BRAM init or BRAM config/routing)
+      // a feature will probably only match one bus (e.g. BRAM init or BRAM
+      // config/routing)
       continue;
     }
     const auto &segbits = features_segbits.at(tile_feature);

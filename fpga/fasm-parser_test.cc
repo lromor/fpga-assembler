@@ -192,12 +192,15 @@ void LongValueParseTest() {
   const LongValueTestCase tests[] = {
     // Names
 
-    {"ASSIGN_LONG[191:0] = 192'h0123456789ABCDEFDEADBEEFDEADBEEFAABBCCDDEEFF0011", ParseResult::kSuccess,  //
-     "ASSIGN_LONG", {
-        {0,   64, 0xAABBCCDDEEFF0011UL},
-        {64,  64, 0xDEADBEEFDEADBEEFUL},
-        {128, 64, 0x0123456789ABCDEFUL},
-    }},
+    {"ASSIGN_LONG[191:0] = "
+     "192'h0123456789ABCDEFDEADBEEFDEADBEEFAABBCCDDEEFF0011",
+     ParseResult::kSuccess,  //
+     "ASSIGN_LONG",
+     {
+       {0, 64, 0xAABBCCDDEEFF0011UL},
+       {64, 64, 0xDEADBEEFDEADBEEFUL},
+       {128, 64, 0x0123456789ABCDEFUL},
+     }},
   };
 
   for (const LongValueTestCase &expected : tests) {
@@ -210,7 +213,8 @@ void LongValueParseTest() {
         [&](uint32_t, std::string_view n, int min_bit, int width,
             uint64_t bits) {
           EXPECT_EQ(n, expected.feature_name) << expected.input << "\n";
-          EXPECT_EQ(min_bit, expected.chunks[i].min_bit) << expected.input << "\n";
+          EXPECT_EQ(min_bit, expected.chunks[i].min_bit)
+            << expected.input << "\n";
           EXPECT_EQ(width, expected.chunks[i].width) << expected.input << "\n";
           EXPECT_EQ(bits, expected.chunks[i].bits) << expected.input << "\n";
           i++;
