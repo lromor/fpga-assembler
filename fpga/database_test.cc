@@ -149,6 +149,9 @@ TEST(PartDatabase, AliasedTileResolvesOwnPseudoPIPs) {
 
   // Unknown features fail loudly with the feature name instead of a bare
   // hash-map lookup abort.
+  // The const-correctness warning is on a unique_ptr gtest declares inside
+  // the EXPECT_DEATH macro, not on this test.
+  // NOLINTNEXTLINE(misc-const-correctness)
   EXPECT_DEATH(db.ConfigBits("LIOI3_SING_X0Y50", "NOT.A.FEATURE", 0,
                              [](ConfigBusType, uint32_t,
                                 const PartDatabase::FrameBit &, bool) {}),
