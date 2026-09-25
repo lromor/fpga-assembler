@@ -16,7 +16,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
-#include <optional>
 #include <utility>
 #include <vector>
 
