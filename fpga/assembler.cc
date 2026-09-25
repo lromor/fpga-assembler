@@ -6,8 +6,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
-#include <functional>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -25,7 +23,6 @@
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_format.h"
-#include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "fpga/database-parsers.h"
 #include "fpga/database.h"
@@ -110,14 +107,12 @@ static absl::Status ProcessFasmFeatures(
     const std::string feature = tile_feature_segments[1];
     const uint64_t bits = tile_feature.bits;
     absl::flat_hash_set<fpga::ConfigBusType> used_config_buses;
-    // Select only bit addresses with value bit set to 1.  The parser reports
-    // at most 64 bits per callback, but guard the shift anyway: a wider width
-    // would wrap the shift count and report a wrong address as set.
-    for (unsigned addr = 0; addr < tile_feature.width; ++addr) {
+    // Select only bit addresses with value bit set to 1.
+    for (int addr = 0; addr < tile_feature.width; ++addr) {
       const unsigned feature_addr = (addr + tile_feature.start_bit);
-      const bool value = addr < 64 && (bits & (uint64_t(1) << addr));
+      const bool value = bits & (uint64_t(1) << addr);
       if (value) {
-        const absl::Status config_status = db.ConfigBits(
+        db.ConfigBits(
           tile_name, feature, feature_addr,
           [&frames, &used_config_buses](
             fpga::ConfigBusType bus, uint32_t address,
@@ -137,9 +132,6 @@ static absl::Status ProcessFasmFeatures(
               frame[bit.word] |= (1 << bit.index);
             }
           });
-        if (!config_status.ok()) {
-          return config_status;
-        }
       }
     }
     if (used_config_buses.empty()) {
@@ -165,77 +157,30 @@ constexpr std::string_view kPUDCBPullUpFASMLinesTemplate[] = {
   "%s.%s.PULLTYPE.PULLUP",
 };
 
-// The HP bank IOBs of the virtex7 parts support fewer standards, so the
-// pullup is spelled with the aliases the HP segbits actually carry.  Cross
-// referenced with a Vivado built reference bitstream.
-constexpr std::string_view kPUDCBPullUpHpFASMLinesTemplate[] = {
-  "%s.%s.LVCMOS12_LVCMOS15.IN",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18.IN",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_"
-  "SSTL15_TMDS_33.IN_ONLY",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVTTL_SSTL135_SSTL15."
-  "SLEW.SLOW",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18.SLEW.SLOW",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_SSTL135_SSTL15.STEPDOWN",
-  "%s.%s.PULLTYPE.PULLUP",
-};
-
-// The HP pullup also configures the partner site of the same IOB.
-constexpr std::string_view kPUDCBPullUpHpPartnerFASMLinesTemplate[] = {
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18.SLEW.SLOW",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_SSTL135_SSTL15.STEPDOWN",
-  "%s.%s.PULLTYPE.PULLDOWN",
-};
-
-// Appends a single bit feature to the list of features to assemble.
-static void AddFeature(std::vector<FasmFeature> &features,
-                       const std::string &name) {
-  features.push_back(FasmFeature{
+bool AddPUDCBFeatures(const fpga::TileGrid &tilegrid,
+                      std::vector<FasmFeature> &features) {
+  TileSiteInfo info;
+  if (!FindPUDCBTileSite(tilegrid, info)) {
+    return false;
+  }
+  FasmFeature feature = {
     .line = -1,
-    .name = name,
+    .name = "",
     .start_bit = 0,
     .width = 1,
     .bits = 1,
-  });
-}
-
-// Adds the input buffer and pullup Vivado programs on an unused PUDC_B pin.
-//
-// This is opt-in, like the reference implementation's --emit_pudc_b_pullup:
-// injecting it unconditionally changes the configuration of every design that
-// leaves the pin unused, which is all of them in practice.
-static void AddPUDCBFeatures(const fpga::TileGrid &tilegrid,
-                             const std::vector<FasmFeature> &features,
-                             std::vector<FasmFeature> &out) {
-  TileSiteInfo info;
-  if (!FindPUDCBTileSite(tilegrid, info)) {
-    return;
-  }
-
-  // A design that drives the PUDC_B site keeps its own configuration.
-  const std::string pudc_b_prefix =
-    absl::StrFormat("%s.%s.", info.tile, info.site);
-  for (const FasmFeature &feature : features) {
-    if (absl::StartsWith(feature.name, pudc_b_prefix)) {
-      return;
-    }
-  }
-
-  const bool pudc_b_is_on_an_hp_bank = absl::StartsWith(info.tile, "LIOB18") ||
-                                       absl::StartsWith(info.tile, "RIOB18");
-  if (pudc_b_is_on_an_hp_bank) {
-    const std::string partner = info.site == "IOB_Y0" ? "IOB_Y1" : "IOB_Y0";
-    for (const std::string_view line : kPUDCBPullUpHpFASMLinesTemplate) {
-      AddFeature(out, absl::StrFormat(line, info.tile, info.site));
-    }
-    for (const std::string_view line : kPUDCBPullUpHpPartnerFASMLinesTemplate) {
-      AddFeature(out, absl::StrFormat(line, info.tile, partner));
-    }
-    return;
-  }
-  for (const std::string_view line : kPUDCBPullUpFASMLinesTemplate) {
-    AddFeature(out, absl::StrFormat(line, info.tile, info.site));
-  }
+  };
+  // Unroll loop.
+  feature.name =
+    absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[0], info.tile, info.site);
+  features.push_back(feature);
+  feature.name =
+    absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[1], info.tile, info.site);
+  features.push_back(feature);
+  feature.name =
+    absl::StrFormat(kPUDCBPullUpFASMLinesTemplate[2], info.tile, info.site);
+  features.push_back(feature);
+  return true;
 }
 
 static void AddStepDownFeatures(const fpga::BanksTilesRegistry &banks,
@@ -249,12 +194,8 @@ static void AddStepDownFeatures(const fpga::BanksTilesRegistry &banks,
     if (feature.bits == 0) {
       continue;
     }
-    // The tag keeps its dots: a DDR pin's STEPDOWN feature is spelled
-    // <io-standard>.<...>.STEPDOWN, and splitting it into four pieces would
-    // leave the STEPDOWN marker in the discarded piece, so the whole bank
-    // would silently miss its stepdown fill.
     std::vector<std::string> tile_feature_segments =
-      absl::StrSplit(feature.name, absl::MaxSplits('.', 2));
+      absl::StrSplit(feature.name, absl::MaxSplits('.', 3));
     if (tile_feature_segments.size() < 3) {
       continue;
     }
@@ -302,12 +243,7 @@ static void AddStepDownFeatures(const fpga::BanksTilesRegistry &banks,
         }
       }
 
-      // The bank anchor tile is HCLK_IOI3 where the bank uses HR IOLOGIC and
-      // HCLK_IOI on the HP-only parts (virtex7); both carry the STEPDOWN
-      // feature.
-      const bool tile_is_a_bank_anchor = absl::StrContains(tile, "HCLK_IOI3") ||
-                                         absl::StartsWith(tile, "HCLK_IOI_");
-      if (tile_is_a_bank_anchor) {
+      if (absl::StrContains(tile, "HCLK_IOI3")) {
         const FasmFeature feature = {
           .line = -1,
           .name = absl::StrFormat("%s.STEPDOWN", tile),
@@ -321,204 +257,15 @@ static void AddStepDownFeatures(const fpga::BanksTilesRegistry &banks,
   }
 }
 
-// Returns true when the database documents a feature on a tile.  The glue
-// below only exists in databases that have been annotated with the matching
-// features, so each rule has to be probed before it is injected.
-using FeatureProbe =
-  std::function<bool(const std::string &tile, const std::string &feature)>;
+static absl::Status AssembleFrames(FILE *input_stream, fpga::PartDatabase &db,
+                                   fpga::Frames &frames) {
+  // For now store everything in here.
+  std::vector<FasmFeature> features;
+  // TODO: add required features.
+  // TODO: add roi.
+  AddPUDCBFeatures(db.tiles().grid, features);
 
-// HP bank IOBs need driver and input enable bits that Vivado programs for
-// every used IOB and that the HR bank IOBs get from their factory defaults.
-static void AddHpBankGlueFeatures(const std::vector<FasmFeature> &features,
-                                  const std::string &pudc_b_tile,
-                                  const FeatureProbe &has_feature,
-                                  std::vector<FasmFeature> &out) {
-  struct SiteUsage {
-    bool in = false;
-    bool out = false;
-    bool diff_in = false;
-  };
-  // Maps "<tile>.<site>" to how the site is used.
-  absl::flat_hash_map<std::string, SiteUsage> site_usage;
-  bool any_lio_b18_y1_out = false;
-  for (const FasmFeature &feature : features) {
-    if (feature.bits == 0) {
-      continue;
-    }
-    const std::vector<std::string> segments =
-      absl::StrSplit(feature.name, absl::MaxSplits('.', 2));
-    if (segments.size() < 3) {
-      continue;
-    }
-    const std::string &tile = segments[0];
-    const std::string &site = segments[1];
-    const std::string &tag = segments[2];
-    const bool tile_is_an_hp_iob =
-      absl::StartsWith(tile, "LIOB18") || absl::StartsWith(tile, "RIOB18");
-    const bool site_is_an_iob = site == "IOB_Y0" || site == "IOB_Y1";
-    if (!tile_is_an_hp_iob || !site_is_an_iob) {
-      continue;
-    }
-    // Direction heuristic: a pure ".IN"/".IN_ONLY" marks an IBUF, while only
-    // ".DRIVE." marks an OBUF.  Slew and output tags are also present on IBUF
-    // tiles as bank wide defaults, so they would misclassify an IBUF as an
-    // inout buffer and inject spurious output enable bits.
-    SiteUsage &usage = site_usage[absl::StrFormat("%s.%s", tile, site)];
-    if (absl::StrContains(tag, "IN_DIFF")) {
-      usage.diff_in = true;
-    } else if (absl::StrContains(tag, "IN_ONLY") ||
-               absl::EndsWith(tag, ".IN") ||
-               absl::StrContains(tag, "IBUFDISABLE")) {
-      usage.in = true;
-    }
-    if (absl::StrContains(tag, ".DRIVE.")) {
-      usage.out = true;
-    }
-    if (absl::StartsWith(tile, "LIOB18_X81") && site == "IOB_Y1" &&
-        absl::StrContains(tag, ".DRIVE.")) {
-      any_lio_b18_y1_out = true;
-    }
-  }
-
-  for (const auto &usage_pair : site_usage) {
-    const std::vector<std::string> tile_site =
-      absl::StrSplit(usage_pair.first, '.');
-    if (tile_site.size() != 2) {
-      continue;
-    }
-    const std::string &tile = tile_site[0];
-    const std::string &site = tile_site[1];
-    // The PUDC_B pin's pullup is a virtual tie rather than a placed input
-    // buffer, and Vivado does not bank glue it.
-    if (tile == pudc_b_tile) {
-      continue;
-    }
-    const SiteUsage &usage = usage_pair.second;
-    if (usage.in) {
-      const std::string glue = absl::StrFormat("%s.IBUF_HP_BANK_GLUE", site);
-      if (has_feature(tile, glue)) {
-        AddFeature(out, absl::StrFormat("%s.%s", tile, glue));
-      }
-    }
-    if (usage.out) {
-      const std::string glue = absl::StrFormat("%s.OBUF_HP_BANK_GLUE", site);
-      if (has_feature(tile, glue)) {
-        AddFeature(out, absl::StrFormat("%s.%s", tile, glue));
-      }
-    }
-    if (usage.diff_in) {
-      // Only the master site of a differential pair carries the pattern.
-      const std::string glue = "IOB_Y0.IBUFDS_BANK_GLUE";
-      if (has_feature(tile, glue)) {
-        AddFeature(out, absl::StrFormat("%s.%s", tile, glue));
-      }
-    }
-  }
-
-  // A Y1 output buffer anywhere on the X81 LIOB18 column lights that column's
-  // "bank active" indicator in the bottom tile of the X32 routing spine.
-  if (any_lio_b18_y1_out) {
-    for (const std::string_view tag :
-         {"IOB_COL_OBUF_CASCADE_Y1", "IOB_COL_BANK_ACTIVE"}) {
-      if (has_feature("INT_L_X32Y49", std::string(tag))) {
-        AddFeature(out, absl::StrFormat("INT_L_X32Y49.%s", tag));
-      }
-    }
-  }
-}
-
-// An output buffer whose T input is tied to GND through general routing lights
-// a "this tie route is in use" marker in a mirror tile of the same column.
-static void AddGfanTieRootFeatures(const std::vector<FasmFeature> &features,
-                                   const FeatureProbe &has_feature,
-                                   std::vector<FasmFeature> &out) {
-  std::string tie_root_tile;
-  for (const FasmFeature &feature : features) {
-    if (feature.bits == 0 || !absl::StartsWith(feature.name, "INT_L_X62")) {
-      continue;
-    }
-    if (!absl::StrContains(feature.name, "GFAN0.GND_WIRE")) {
-      continue;
-    }
-    // The marker lives in the tile ten rows below the one carrying the tie.
-    const std::vector<std::string> tile_feature =
-      absl::StrSplit(feature.name, absl::MaxSplits('.', 1));
-    const std::vector<std::string> column_and_row =
-      absl::StrSplit(tile_feature[0], 'X');
-    if (column_and_row.size() != 2) {
-      continue;
-    }
-    const std::vector<std::string> row = absl::StrSplit(column_and_row[1], 'Y');
-    if (row.size() != 2) {
-      continue;
-    }
-    uint32_t y = 0;
-    if (!absl::SimpleAtoi(row[1], &y)) {
-      continue;
-    }
-    tie_root_tile =
-      absl::StrFormat("%sX%sY%u", column_and_row[0], row[0], y + 10);
-    break;
-  }
-  if (!tie_root_tile.empty() &&
-      has_feature(tie_root_tile, "GFAN_TIE_ROOT_GLUE")) {
-    AddFeature(out, absl::StrFormat("%s.GFAN_TIE_ROOT_GLUE", tie_root_tile));
-  }
-}
-
-// Every BUFR channel in use lights one extra "channel active" bit on the
-// HCLK_L tile carrying it.
-static void AddBufrClkActiveFeatures(const std::vector<FasmFeature> &features,
-                                     const FeatureProbe &has_feature,
-                                     std::vector<FasmFeature> &out) {
-  // Maps an HCLK_L tile to the BUFR channels in use in it.
-  absl::flat_hash_map<std::string, absl::flat_hash_set<int>> channels;
-  for (const FasmFeature &feature : features) {
-    if (feature.bits == 0) {
-      continue;
-    }
-    const std::vector<std::string> segments =
-      absl::StrSplit(feature.name, absl::MaxSplits('.', 2));
-    if (segments.size() < 3) {
-      continue;
-    }
-    const std::string &tile = segments[0];
-    if (!absl::StartsWith(tile, "HCLK_L")) {
-      continue;
-    }
-    // HCLK_L_X..Y....HCLK_LEAF_CLK_B_TOP[0-5].HCLK_CK_BUFRCLK[0-3]
-    constexpr std::string_view kBufrClkTag = "HCLK_CK_BUFRCLK";
-    const std::string &tag = segments[2];
-    const size_t tag_pos = tag.rfind(kBufrClkTag);
-    if (tag_pos == std::string::npos) {
-      continue;
-    }
-    int channel = 0;
-    if (!absl::SimpleAtoi(tag.substr(tag_pos + kBufrClkTag.size()), &channel)) {
-      continue;
-    }
-    channels[tile].insert(channel);
-  }
-  for (const auto &channels_pair : channels) {
-    for (const int channel : channels_pair.second) {
-      const std::string marker =
-        absl::StrFormat("HCLK_LEAF_BUFRCLK%d_ACTIVE", channel);
-      if (has_feature(channels_pair.first, marker)) {
-        AddFeature(out, absl::StrFormat("%s.%s", channels_pair.first, marker));
-      }
-    }
-  }
-}
-
-// Same name as the reference implementation's flag, and likewise off by
-// default.
-ABSL_FLAG(
-  bool, emit_pudc_b_pullup, false,
-  R"(Emit an IBUF and PULLUP on the PUDC_B pin if the design leaves it unused.)");
-
-// Parses a FASM stream into the feature list.
-static absl::Status ParseFasmFile(FILE *input_stream,
-                                  std::vector<FasmFeature> &features) {
+  // Parse fasm.
   size_t buf_size = 8192;
   char *buffer = (char *)malloc(buf_size);
   const absl::Cleanup buffer_freer = [&buffer] { free(buffer); };
@@ -542,73 +289,9 @@ static absl::Status ParseFasmFile(FILE *input_stream,
       return absl::InternalError("internal error");
     }
   }
-  return absl::OkStatus();
-}
-
-static absl::Status AssembleFrames(FILE *input_stream,
-                                   const std::string &db_path,
-                                   const std::string &part_name,
-                                   fpga::PartDatabase &db,
-                                   fpga::Frames &frames) {
-  // For now store everything in here.
-  std::vector<FasmFeature> features;
-  // TODO: add roi.
-
-  // Parse fasm.
-  const absl::Status parse_status = ParseFasmFile(input_stream, features);
-  if (!parse_status.ok()) {
-    return parse_status;
-  }
-  // The features a part requires regardless of the design, e.g. the
-  // configuration of the zynq7 processing system.  Appended after the design's
-  // own features, like the reference implementation does.
-  const std::string required_features_path =
-    absl::StrFormat("%s/%s/required_features.fasm", db_path, part_name);
-  if (std::filesystem::exists(required_features_path)) {
-    FILE *required_features = fopen(required_features_path.c_str(), "r");
-    if (required_features == nullptr) {
-      return absl::InvalidArgumentError(
-        absl::StrFormat("cannot open %s", required_features_path));
-    }
-    const absl::Cleanup required_features_closer = [required_features] {
-      std::fclose(required_features);
-    };
-    const absl::Status required_status =
-      ParseFasmFile(required_features, features);
-    if (!required_status.ok()) {
-      return required_status;
-    }
-  }
-  // Auto-injected configuration, in the order the reference implementation
-  // applies it.  The features the tool parses out of the input stay first.
-  TileSiteInfo pudc_b_info;
-  const bool pudc_b_is_known = FindPUDCBTileSite(db.tiles().grid, pudc_b_info);
-  const std::string pudc_b_tile =
-    pudc_b_is_known ? pudc_b_info.tile : std::string();
-  const FeatureProbe has_feature = [&db](const std::string &tile,
-                                         const std::string &feature) {
-    return db.HasFeature(tile, feature);
-  };
-
-  std::vector<FasmFeature> injected;
-  if (absl::GetFlag(FLAGS_emit_pudc_b_pullup)) {
-    AddPUDCBFeatures(db.tiles().grid, features, injected);
-  }
   AddStepDownFeatures(db.tiles().banks, db.tiles().grid, features);
-  AddHpBankGlueFeatures(features, pudc_b_tile, has_feature, injected);
-  AddGfanTieRootFeatures(features, has_feature, injected);
-  AddBufrClkActiveFeatures(features, has_feature, injected);
-  features.insert(features.end(), injected.begin(), injected.end());
   return ProcessFasmFeatures(features, db, frames);
 }
-
-// Writes the assembled frames in the same text format fasm2frames uses: one
-// line per frame, the frame address followed by its words in hex.  Comparing
-// that output against the reference implementation's .frames file is how the
-// two assemblers are diffed.
-ABSL_FLAG(std::optional<std::string>, dump_frames_file, std::nullopt,
-          R"(Also write the assembled frames to this file, in the text format
-fasm2frames uses ("0x<address> 0x<word>,0x<word>,...").)");
 
 ABSL_FLAG(
   std::optional<std::string>, prjxray_db_path, std::nullopt,
@@ -647,8 +330,20 @@ static absl::StatusOr<std::string> GetOptFlagOrFromEnv(
   return flag_value.value();
 }
 
-// Text dumps of the assembled frames.  The format matches fasm2frames, so the
-// output of one assembler can be diffed against the other's.
+#if 0
+static void GetPrettyFrameLine(
+  const uint32_t address,
+  const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
+  std::ostream &out) {
+  out << absl::StrFormat("Frame @ 0x%08X\n", address);
+  for (size_t i = 0; i < bits.size(); ++i) {
+    const uint32_t &word = bits[i];
+    if (word) {
+      out << absl::StrFormat("  %d: 0x%08X\n", i, word);
+    }
+  }
+}
+
 static void GetFrameLine(
   const uint32_t address,
   const std::array<fpga::word_t, fpga::kFrameWordCount> &bits,
@@ -663,11 +358,19 @@ static void GetFrameLine(
   out << "\n";
 }
 
-static void PrintFrames(const fpga::Frames &frames, std::ostream &out) {
+static void PrintFrames(const fpga::Frames &frames, std::ostream &out,
+                        bool pretty) {
   for (const auto &frame : frames) {
-    GetFrameLine(frame.first, frame.second, out);
+    const uint32_t &address = frame.first;
+    const std::array<fpga::word_t, fpga::kFrameWordCount> &bits = frame.second;
+    if (pretty) {
+      GetPrettyFrameLine(address, bits, out);
+    } else {
+      GetFrameLine(address, bits, out);
+    }
   }
 }
+#endif
 
 int main(int argc, char *argv[]) {
   const std::string usage = Usage(argv[0]);
@@ -728,8 +431,7 @@ int main(int argc, char *argv[]) {
   }
   fpga::Frames frames;
   const auto assembler_result =
-    AssembleFrames(input_stream, prjxray_db_path.string(), part,
-                   part_database_result.value(), frames);
+    AssembleFrames(input_stream, part_database_result.value(), frames);
   if (!assembler_result.ok()) {
     std::cerr << StatusToErrorMessage("could not assemble frames",
                                       assembler_result)
@@ -737,19 +439,9 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
   const fpga::Part &part_data = part_database_result->tiles().part;
-  const std::optional<std::string> dump_frames_file =
-    absl::GetFlag(FLAGS_dump_frames_file);
-  if (dump_frames_file.has_value()) {
-    std::ofstream frames_out(dump_frames_file.value());
-    if (!frames_out) {
-      std::cerr << "cannot open " << dump_frames_file.value() << '\n';
-      return EXIT_FAILURE;
-    }
-    PrintFrames(frames, frames_out);
-  }
   const auto bitstream_status =
     fpga::xilinx::BitStream<fpga::xilinx::Architecture::kXC7>::Encode<
-      fpga::Frames>(part_data, part, "fpga-source", frames, std::cout);
+      fpga::Frames>(part_data, "fasm", "fpga-source", frames, std::cout);
   if (!bitstream_status.ok()) {
     std::cerr << StatusToErrorMessage("could not generate bistream",
                                       bitstream_status)

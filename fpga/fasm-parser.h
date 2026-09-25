@@ -330,30 +330,17 @@ inline ParseResult Parse(std::string_view content, FILE *errstream,
       }
 
       // Ready to report the feature and their bits.
-      // Report the value in 64 bit chunks, lowest chunk first.  The value's
-      // least significant bit sits on min_bit, so chunk k carries the bits of
-      // the addresses min_bit + 64k and upwards.  A chunk that would only
-      // cover addresses above the range's top is dropped; the reference
-      // implementation walks the range from min_bit to max_bit in the same
-      // order and takes each address' value bit.
-      //
-      // Deriving the chunk width from the range rather than from the value is
-      // what keeps the shift below in range: a range wider than 64 bits used to
-      // produce a width above 64, and the mask below then wrapped and silently
-      // discarded every value bit above the wrapped count.
-      const size_t chunk_count =
-        std::min<size_t>(bitset.size(), (width + 63) / 64);
-      for (size_t chunk = 0; chunk < chunk_count; chunk++) {
-        const unsigned chunk_first_bit = 64 * unsigned(chunk);
-        const unsigned value_width =
-          std::min<unsigned>(64, width - chunk_first_bit);
+      for (unsigned chunk = 0; chunk < bitset.size(); chunk++) {
         auto value = bitset.at(chunk);
-        if (value_width < 64) {
-          value &= uint64_t(-1) >> (64 - value_width);
+        unsigned value_width = 64;
+        if (chunk == (bitset.size() - 1)) {
+          value_width = unsigned(width - 64 * (bitset.size() - 1));
         }
+        value &=
+          uint64_t(-1) >> (64 - value_width);  // Clamp bits if value too wide
         if (fasm_unlikely(!parse_callback(line_number, feature,
-                                          min_bit + chunk_first_bit,
-                                          value_width, value))) {
+                                          min_bit + chunk * 64, value_width,
+                                          value))) {
           result = std::max(result, ParseResult::kUserAbort);
           break;
         }

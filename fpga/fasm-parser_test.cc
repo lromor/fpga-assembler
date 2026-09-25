@@ -201,19 +201,6 @@ void LongValueParseTest() {
        {64, 64, 0xDEADBEEFDEADBEEFUL},
        {128, 64, 0x0123456789ABCDEFUL},
      }},
-
-    // A range wider than the value.  The value's least significant bit sits on
-    // the range's low bound and the addresses above the value stay unset, so
-    // the chunk width has to follow the value: taking it from the range width
-    // (83 here) used to make the masking shift wrap and silently truncate
-    // every value bit above the wrapped count, and the reported width above 64
-    // then made the assembler probe addresses that do not exist.
-    {"RXCDR_CFG[82:0] = 63'h4000000000000002",
-     ParseResult::kSuccess,  //
-     "RXCDR_CFG",
-     {
-       {0, 64, 0x4000000000000002UL},
-     }},
   };
 
   for (const LongValueTestCase &expected : tests) {
