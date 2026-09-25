@@ -14,6 +14,7 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/substitute.h"
 #include "fpga/database-parsers.h"
 #include "fpga/database.h"
 
@@ -70,32 +71,32 @@ std::vector<std::string> GetIOBSites(const TileGrid &grid,
 
 // Template that for each line should substitute a tile type and a site.
 constexpr std::string_view kPUDCBPullUpFASMLinesTemplate[] = {
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_"
+  "$0.$1.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_"
   "SSTL15_TMDS_33.IN_ONLY",
-  "%s.%s.LVCMOS25_LVCMOS33_LVTTL.IN",
-  "%s.%s.PULLTYPE.PULLUP",
+  "$0.$1.LVCMOS25_LVCMOS33_LVTTL.IN",
+  "$0.$1.PULLTYPE.PULLUP",
 };
 
 // The HP bank IOBs of the virtex7 parts support fewer standards, so the
 // pullup is spelled with the aliases the HP segbits actually carry.  Cross
 // referenced with a Vivado built reference bitstream.
 constexpr std::string_view kPUDCBPullUpHpFASMLinesTemplate[] = {
-  "%s.%s.LVCMOS12_LVCMOS15.IN",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18.IN",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_"
+  "$0.$1.LVCMOS12_LVCMOS15.IN",
+  "$0.$1.LVCMOS12_LVCMOS15_LVCMOS18.IN",
+  "$0.$1.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_"
   "SSTL15_TMDS_33.IN_ONLY",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVTTL_SSTL135_SSTL15."
+  "$0.$1.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVTTL_SSTL135_SSTL15."
   "SLEW.SLOW",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18.SLEW.SLOW",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_SSTL135_SSTL15.STEPDOWN",
-  "%s.%s.PULLTYPE.PULLUP",
+  "$0.$1.LVCMOS12_LVCMOS15_LVCMOS18.SLEW.SLOW",
+  "$0.$1.LVCMOS12_LVCMOS15_LVCMOS18_SSTL135_SSTL15.STEPDOWN",
+  "$0.$1.PULLTYPE.PULLUP",
 };
 
 // The HP pullup also configures the partner site of the same IOB.
 constexpr std::string_view kPUDCBPullUpHpPartnerFASMLinesTemplate[] = {
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18.SLEW.SLOW",
-  "%s.%s.LVCMOS12_LVCMOS15_LVCMOS18_SSTL135_SSTL15.STEPDOWN",
-  "%s.%s.PULLTYPE.PULLDOWN",
+  "$0.$1.LVCMOS12_LVCMOS15_LVCMOS18.SLEW.SLOW",
+  "$0.$1.LVCMOS12_LVCMOS15_LVCMOS18_SSTL135_SSTL15.STEPDOWN",
+  "$0.$1.PULLTYPE.PULLDOWN",
 };
 
 // Appends a single bit feature to the list of features to assemble.
@@ -136,15 +137,15 @@ void AddPUDCBFeatures(const TileGrid &tilegrid,
   if (pudc_b_is_on_an_hp_bank) {
     const std::string partner = info.site == "IOB_Y0" ? "IOB_Y1" : "IOB_Y0";
     for (const std::string_view line : kPUDCBPullUpHpFASMLinesTemplate) {
-      AddFeature(out, absl::StrFormat(line, info.tile, info.site));
+      AddFeature(out, absl::Substitute(line, info.tile, info.site));
     }
     for (const std::string_view line : kPUDCBPullUpHpPartnerFASMLinesTemplate) {
-      AddFeature(out, absl::StrFormat(line, info.tile, partner));
+      AddFeature(out, absl::Substitute(line, info.tile, partner));
     }
     return;
   }
   for (const std::string_view line : kPUDCBPullUpFASMLinesTemplate) {
-    AddFeature(out, absl::StrFormat(line, info.tile, info.site));
+    AddFeature(out, absl::Substitute(line, info.tile, info.site));
   }
 }
 
