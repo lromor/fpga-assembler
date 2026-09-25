@@ -66,14 +66,14 @@ static absl::Status ProcessFasmFeatures(
       return absl::InvalidArgumentError(
         absl::StrFormat("cannot split feature name %s", tile_feature.name));
     }
-    const std::string& tile_name = tile_feature_segments[0];
-    const std::string& feature = tile_feature_segments[1];
+    const std::string &tile_name = tile_feature_segments[0];
+    const std::string &feature = tile_feature_segments[1];
     const uint64_t bits = tile_feature.bits;
     absl::flat_hash_set<fpga::ConfigBusType> used_config_buses;
     // Select only bit addresses with value bit set to 1.  The parser reports
     // at most 64 bits per callback, but guard the shift anyway: a wider width
     // would wrap the shift count and report a wrong address as set.
-    for (unsigned addr = 0; std::cmp_less(addr , tile_feature.width); ++addr) {
+    for (unsigned addr = 0; std::cmp_less(addr, tile_feature.width); ++addr) {
       const unsigned feature_addr = (addr + tile_feature.start_bit);
       const bool value = addr < 64 && (bits & (uint64_t(1) << addr));
       if (value) {

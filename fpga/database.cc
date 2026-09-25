@@ -178,9 +178,8 @@ static absl::Status GetDatabasePaths(
     filename.size() - kTileTypeJSONPrefix.size() - kTileTypeJSONSuffix.size();
   std::string tile_type = filename.substr(core_start, core_length);
   std::string tile_type_lower;
-  std::ranges::transform(tile_type,
-                 std::back_inserter(tile_type_lower),
-                 [](unsigned char c) { return std::tolower(c); });
+  std::ranges::transform(tile_type, std::back_inserter(tile_type_lower),
+                         [](unsigned char c) { return std::tolower(c); });
 
   struct TileTypeDatabasePaths paths;
   paths.tile_type_json = path;
