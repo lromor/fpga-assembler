@@ -29,12 +29,23 @@
 
 namespace fpga {
 absl::StatusOr<BanksTilesRegistry> BanksTilesRegistry::Create(
-  const Part &part, const PackagePins &package_pins) {
+  const Part &part, const PackagePins &package_pins, const TileGrid &grid) {
   absl::flat_hash_map<std::string, std::vector<uint32_t>> tile_to_banks;
   absl::flat_hash_map<uint32_t, absl::flat_hash_set<std::string>>
     banks_to_tiles_set;
   for (const auto &pair : part.iobanks) {
-    const std::string tile = "HCLK_IOI3_" + pair.second;
+    // The tile holding a bank's IOLOGIC is HCLK_IOI3 on the families whose
+    // banks use HR IOLOGIC, and HCLK_IOI on the HP-only ones (virtex7), so
+    // take whichever the grid has.  A bank whose anchor is neither is skipped
+    // rather than registered under a tile that does not exist.
+    const std::string hclk_ioi3 = "HCLK_IOI3_" + pair.second;
+    const std::string hclk_ioi = "HCLK_IOI_" + pair.second;
+    const bool has_hclk_ioi3 = grid.contains(hclk_ioi3);
+    const bool has_hclk_ioi = grid.contains(hclk_ioi);
+    if (!has_hclk_ioi3 && !has_hclk_ioi) {
+      continue;
+    }
+    const std::string &tile = has_hclk_ioi3 ? hclk_ioi3 : hclk_ioi;
     banks_to_tiles_set[pair.first].insert(tile);
     if (!tile_to_banks.contains(tile)) {
       tile_to_banks.insert({tile, {}});
@@ -280,7 +291,8 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
 }
 
 absl::StatusOr<fpga::BanksTilesRegistry> CreateBanksRegistry(
-  const fpga::Part &part, const std::filesystem::path &package_pins_path) {
+  const fpga::Part &part, const fpga::TileGrid &grid,
+  const std::filesystem::path &package_pins_path) {
   // Parse package pins.
   const absl::StatusOr<std::unique_ptr<fpga::MemoryBlock>>
     package_pins_csv_result = fpga::MemoryMapFile(package_pins_path);
@@ -291,7 +303,7 @@ absl::StatusOr<fpga::BanksTilesRegistry> CreateBanksRegistry(
     return package_pins_result.status();
   }
   const fpga::PackagePins &package_pins = package_pins_result.value();
-  return fpga::BanksTilesRegistry::Create(part, package_pins);
+  return fpga::BanksTilesRegistry::Create(part, package_pins, grid);
 }
 
 absl::StatusOr<PartDatabase> PartDatabase::Parse(std::string_view database_path,
@@ -344,9 +356,9 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(std::string_view database_path,
   }
   const fpga::Part &part = part_result.value();
 
-  auto banks_tiles_registry_result =
-    CreateBanksRegistry(part, std::filesystem::path(database_path) / part_name /
-                                "package_pins.csv");
+  auto banks_tiles_registry_result = CreateBanksRegistry(
+    part, tilegrid_result.value(),
+    std::filesystem::path(database_path) / part_name / "package_pins.csv");
   if (!banks_tiles_registry_result.ok()) {
     return banks_tiles_registry_result.status();
   }
@@ -356,23 +368,40 @@ absl::StatusOr<PartDatabase> PartDatabase::Parse(std::string_view database_path,
   return absl::StatusOr<PartDatabase>(tiles);
 }
 
-// CLBLM_R_X33Y38.SLICEM_X0.ALUT.INIT, CLBLM_R_X33Y38 is a tilename.
-void PartDatabase::ConfigBits(const std::string &tile_name,
-                              const std::string &feature, uint32_t address,
-                              const BitSetter &bit_setter) {
-  // fprintf(stderr, "%s %s %u\n", tile_name.c_str(), feature.c_str(), address);
-  // Given the tilename, get the tile type.
-  const Tile &tile = tiles_->grid.at(tile_name);
-  // Either the feature tile type of the tile type alias.
+// Resolution of a feature name against a tile.  See the declaration for the
+// meaning of the returned fields.
+std::optional<PartDatabase::FeatureLookup> PartDatabase::LookupFeature(
+  const std::string &tile_name, const std::string &feature) {
+  const auto tile_it = tiles_->grid.find(tile_name);
+  if (tile_it == tiles_->grid.end()) {
+    return std::nullopt;
+  }
+  const Tile &tile = tile_it->second;
+  // Either the feature tile type or the tile type alias.
   std::string tile_type = tile.type;
   std::string aliased_feature = feature;
+
+  // A tile whose bits alias another type is either fuzzed natively -- its own
+  // type has a segbits database, whose bit positions are in the tile's own
+  // window -- or only through the alias.  Prefer the tile's own database, the
+  // way the reference implementation does: on the virtex7 LIOB18_SING tiles
+  // the alias metadata is wrong (it names IOB33 sites and misplaces the words)
+  // and following it corrupts the frames of the neighbouring tiles.
+  AddSegbitsToCache(tile.type);
+  const auto own_bits_db = segment_bits_cache_.find(tile.type);
+  const bool own_type_has_segbits = own_bits_db != segment_bits_cache_.end() &&
+                                    !own_bits_db->second.segment_bits.empty();
 
   // Materialize aliased bit maps.
   absl::flat_hash_map<ConfigBusType, BitsBlock> aliased_bits_map;
   for (const auto &pair : tile.bits) {
     const BitsBlock &bits_block = pair.second;
     const ConfigBusType &bus_type = pair.first;
-    if (bits_block.alias.has_value()) {
+    if (!bits_block.alias.has_value() || own_type_has_segbits) {
+      aliased_bits_map.insert({bus_type, bits_block});
+      continue;
+    }
+    {
       const BitsBlockAlias alias = bits_block.alias.value();
       // TODO: check that for each block the aliased tile type is the same.
       tile_type = bits_block.alias.value().type;
@@ -393,63 +422,143 @@ void PartDatabase::ConfigBits(const std::string &tile_name,
         .words = bits_block.words,
       };
       aliased_bits_map.insert({bus_type, aliased_block});
-    } else {
-      aliased_bits_map.insert({bus_type, bits_block});
     }
   }
 
-  // Fill the cache with the current tile type segbits.
-  AddSegbitsToCache(tile_type);
-  CHECK(segment_bits_cache_.contains(tile_type));
+  // A tile whose bits alias another type still has its own pseudo pips
+  // database (RIOI_SING documents pseudo pips that RIOI does not, and the
+  // other way around), so both tile types have to be available.
+  bool tile_type_has_database = AddSegbitsToCache(tile_type);
+  tile_type_has_database |= segment_bits_cache_.contains(tile_type);
+  if (!tile_type_has_database) {
+    return std::nullopt;
+  }
+
+  return FeatureLookup{
+    .bits_blocks = std::move(aliased_bits_map),
+    .tile_type = std::move(tile_type),
+    .pips_tile_type = tile.type,
+    .aliased_feature = std::move(aliased_feature),
+  };
+}
+
+bool PartDatabase::IsPseudoPIP(const std::string &tile_type,
+                               const std::string &key) {
+  const auto cache_it = segment_bits_cache_.find(tile_type);
+  if (cache_it == segment_bits_cache_.end()) {
+    return false;
+  }
+  return cache_it->second.pips.contains(key);
+}
+
+// CLBLM_R_X33Y38.SLICEM_X0.ALUT.INIT, CLBLM_R_X33Y38 is a tilename.
+absl::Status PartDatabase::ConfigBits(const std::string &tile_name,
+                                      const std::string &feature,
+                                      uint32_t address,
+                                      const BitSetter &bit_setter) {
+  const std::optional<FeatureLookup> lookup = LookupFeature(tile_name, feature);
+  if (!lookup.has_value()) {
+    return absl::InvalidArgumentError(
+      absl::StrFormat("no tile type database for tile \"%s\"", tile_name));
+  }
   const SegmentsBitsWithPseudoPIPs &tile_type_features_bits =
-    segment_bits_cache_.at(tile_type);
+    segment_bits_cache_.at(lookup->tile_type);
   const std::string tile_segments_bits_key =
-    absl::StrJoin({tile_name, aliased_feature}, ".");
-  if (tile_type_features_bits.pips.contains(tile_segments_bits_key)) {
-    return;
+    absl::StrJoin({tile_name, lookup->aliased_feature}, ".");
+  // If it's a pseudo pip, skip: it documents wiring or a tie and configures
+  // no bits.  The pips database of the tile's own type is consulted as well,
+  // because the segbits may come from an alias while the pseudo pips do not.
+  const std::string pips_feature_key =
+    absl::StrJoin({lookup->pips_tile_type, lookup->aliased_feature}, ".");
+  if (IsPseudoPIP(lookup->pips_tile_type, tile_segments_bits_key) ||
+      IsPseudoPIP(lookup->pips_tile_type, pips_feature_key) ||
+      tile_type_features_bits.pips.contains(tile_segments_bits_key)) {
+    return absl::OkStatus();
   }
 
   // Search our database of features and get the segbit.
   const struct TileFeature tile_feature = {
-    .tile_feature = absl::StrJoin({tile_type, aliased_feature}, "."),
+    .tile_feature =
+      absl::StrJoin({lookup->tile_type, lookup->aliased_feature}, "."),
     .address = address,
   };
 
-  // If it's a pseudo pip, skip.
   // TODO(lromor): Is this really necessary? It looks like all pips are
   // different.
   if (tile_type_features_bits.pips.contains(tile_feature.tile_feature)) {
-    return;
+    return absl::OkStatus();
   }
 
   // The tile name has some specific config bus base addresses.
-  bool matched = false;
-  for (const auto &config_bus_bits_pair : aliased_bits_map) {
+  for (const auto &config_bus_bits_pair : lookup->bits_blocks) {
     const ConfigBusType &bus = config_bus_bits_pair.first;
     const uint32_t base_address = config_bus_bits_pair.second.base_address;
     const uint32_t offset = config_bus_bits_pair.second.offset;
-    if (!tile_type_features_bits.segment_bits.contains(bus)) {
+    const auto segbits_it = tile_type_features_bits.segment_bits.find(bus);
+    if (segbits_it == tile_type_features_bits.segment_bits.end()) {
       continue;
     }
-    const SegmentsBits &features_segbits =
-      tile_type_features_bits.segment_bits.at(bus);
-    if (aliased_bits_map.size() > 1 && !features_segbits.count(tile_feature)) {
-      // a feature will probably only match one bus (e.g. BRAM init or BRAM
-      // config/routing)
-      continue;
+    const SegmentsBits &features_segbits = segbits_it->second;
+    const auto feature_it = features_segbits.find(tile_feature);
+    if (feature_it == features_segbits.end()) {
+      if (lookup->bits_blocks.size() > 1) {
+        // a feature will probably only match one bus (e.g. BRAM init or BRAM
+        // config/routing)
+        continue;
+      }
+      return absl::InvalidArgumentError(absl::StrFormat(
+        "no configuration bits for feature \"%s\" on tile \"%s\"", feature,
+        tile_name));
     }
-    const auto &segbits = features_segbits.at(tile_feature);
-    matched = true;
-    for (const auto &segbit : segbits) {
-      const uint32_t address = base_address + segbit.word_column;
+    for (const auto &segbit : feature_it->second) {
+      const uint32_t bit_address = base_address + segbit.word_column;
       const uint32_t bit_pos = offset * kWordSizeBits + segbit.word_bit;
       const FrameBit frame_bit = {
         .word = bit_pos / kWordSizeBits,
         .index = bit_pos % kWordSizeBits,
       };
-      bit_setter(bus, address, frame_bit, segbit.is_set);
+      bit_setter(bus, bit_address, frame_bit, segbit.is_set);
     }
   }
-  CHECK(matched);
+  return absl::OkStatus();
+}
+
+bool PartDatabase::HasFeature(const std::string &tile_name,
+                              const std::string &feature) {
+  const std::optional<FeatureLookup> lookup = LookupFeature(tile_name, feature);
+  if (!lookup.has_value()) {
+    return false;
+  }
+  const SegmentsBitsWithPseudoPIPs &tile_type_features_bits =
+    segment_bits_cache_.at(lookup->tile_type);
+  const std::string tile_segments_bits_key =
+    absl::StrJoin({tile_name, lookup->aliased_feature}, ".");
+  const std::string pips_feature_key =
+    absl::StrJoin({lookup->pips_tile_type, lookup->aliased_feature}, ".");
+  // A feature that maps onto a pseudo pip configures no bits, so it must not
+  // be reported as present: the glue rules would inject a no-op feature.
+  if (IsPseudoPIP(lookup->pips_tile_type, tile_segments_bits_key) ||
+      IsPseudoPIP(lookup->pips_tile_type, pips_feature_key) ||
+      tile_type_features_bits.pips.contains(tile_segments_bits_key) ||
+      tile_type_features_bits.pips.contains(
+        absl::StrJoin({lookup->tile_type, lookup->aliased_feature}, "."))) {
+    return false;
+  }
+  const struct TileFeature tile_feature = {
+    .tile_feature =
+      absl::StrJoin({lookup->tile_type, lookup->aliased_feature}, "."),
+    .address = 0,
+  };
+  for (const auto &config_bus_bits_pair : lookup->bits_blocks) {
+    const auto segbits_it =
+      tile_type_features_bits.segment_bits.find(config_bus_bits_pair.first);
+    if (segbits_it == tile_type_features_bits.segment_bits.end()) {
+      continue;
+    }
+    if (segbits_it->second.contains(tile_feature)) {
+      return true;
+    }
+  }
+  return false;
 }
 }  // namespace fpga
