@@ -155,7 +155,7 @@ static absl::Status AssembleFrames(FILE *input_stream,
   // TODO: add roi.
 
   // Parse fasm.
-  const absl::Status parse_status = ParseFasmFile(input_stream, features);
+  absl::Status parse_status = ParseFasmFile(input_stream, features);
   if (!parse_status.ok()) {
     return parse_status;
   }
