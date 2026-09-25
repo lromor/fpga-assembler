@@ -1,0 +1,10 @@
+# name	part	family	expect
+#
+# expect: frames    -> the frames must equal the reference's, bit for bit
+#         no-frames -> the input is a pseudo PIP; the reference sets no bits
+#         error:... -> assembling must fail with that message (no crash)
+01-missing-feature	xc7a35tfgg484-2	artix7	error:no configuration bits for feature
+02-zynq7-required-features	xc7z010clg400-1	zynq7	frames
+03-pudcb-pullup-opt-in	xc7a35tcsg324-1	artix7	frames
+04-wide-feature-value	xc7a35tfgg484-2	artix7	frames
+06-alias-abort	xc7k325tffg900-2	kintex7	no-frames
