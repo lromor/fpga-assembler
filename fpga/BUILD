@@ -120,6 +120,25 @@ cc_test(
     ],
 )
 
+cc_library(
+    name = "injected-features",
+    srcs = [
+        "injected-features.cc",
+    ],
+    hdrs = [
+        "injected-features.h",
+    ],
+    deps = [
+        ":database",
+        ":database-parsers",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+    ],
+)
+
 cc_binary(
     name = "fpga-as",
     srcs = [
@@ -129,15 +148,14 @@ cc_binary(
         ":database",
         ":database-parsers",
         ":fasm-parser",
+        ":injected-features",
         "//fpga/xilinx:arch-types",
         "//fpga/xilinx:bitstream",
         "@abseil-cpp//absl/cleanup:cleanup",
-        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/flags:flag",
         "@abseil-cpp//absl/flags:parse",
         "@abseil-cpp//absl/flags:usage",
-        "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:str_format",
