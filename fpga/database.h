@@ -30,7 +30,7 @@ class BanksTilesRegistry {
   const_iterator end() const { return banks_to_tiles_.end(); }
 
   static absl::StatusOr<BanksTilesRegistry> Create(
-    const Part &part, const PackagePins &package_pins);
+    const Part &part, const PackagePins &package_pins, const TileGrid &grid);
 
   // Get tiles from an IO bank name.
   std::optional<std::vector<std::string>> Tiles(uint32_t bank) const;
@@ -98,12 +98,39 @@ class PartDatabase {
                                        const FrameBit &bit, bool value)>;
 
   // Set bits to configure a feature in a specific tile.
-  void ConfigBits(const std::string &tile_name, const std::string &feature,
-                  uint32_t address, const BitSetter &bit_setter);
+  // Returns an error when the database has no bits for that feature.
+  absl::Status ConfigBits(const std::string &tile_name,
+                          const std::string &feature, uint32_t address,
+                          const BitSetter &bit_setter);
+
+  // Returns true when the database defines bits for a feature on a tile.
+  //
+  // The glue rules auto-inject features that only exist in databases
+  // annotated with them (for example the HP-bank output enable bits), so they
+  // have to be probed: injecting a feature a database does not know would
+  // otherwise fail the build.  Only single bit features are probed.
+  bool HasFeature(const std::string &tile_name, const std::string &feature);
+
   const struct Tiles &tiles() { return *tiles_; }
 
  private:
   bool AddSegbitsToCache(const std::string &tile_type);
+
+  // Resolution of a feature name against a tile: the tile's bit blocks with
+  // every alias applied, the tile type to look the segbits up under, the tile
+  // type that documents the pseudo pips and the feature name to use.  Returns
+  // nullopt for an unknown tile or tile type.
+  struct FeatureLookup {
+    absl::flat_hash_map<ConfigBusType, BitsBlock> bits_blocks;
+    std::string tile_type;
+    std::string pips_tile_type;
+    std::string aliased_feature;
+  };
+  std::optional<FeatureLookup> LookupFeature(const std::string &tile_name,
+                                             const std::string &feature);
+
+  // True when the given tile type documents key as a pseudo pip.
+  bool IsPseudoPIP(const std::string &tile_type, const std::string &key);
 
   std::shared_ptr<Tiles> tiles_;
   absl::flat_hash_map<std::string, SegmentsBitsWithPseudoPIPs>
