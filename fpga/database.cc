@@ -166,7 +166,7 @@ constexpr std::string_view KFileNameFormatSegbitsBlockRAM =
 constexpr std::string_view KFileNameFormatPseudoPIPs = "ppips_%s.db";
 constexpr std::string_view KFileNameFormatMask = "mask_%s.db";
 
-absl::Status GetDatabasePaths(
+static absl::Status GetDatabasePaths(
   const std::filesystem::path &path,
   absl::flat_hash_map<std::string, TileTypeDatabasePaths> &out) {
   const std::string filename = path.filename();
@@ -178,7 +178,7 @@ absl::Status GetDatabasePaths(
     filename.size() - kTileTypeJSONPrefix.size() - kTileTypeJSONSuffix.size();
   std::string tile_type = filename.substr(core_start, core_length);
   std::string tile_type_lower;
-  std::transform(tile_type.begin(), tile_type.end(),
+  std::ranges::transform(tile_type,
                  std::back_inserter(tile_type_lower),
                  [](unsigned char c) { return std::tolower(c); });
 
@@ -212,7 +212,7 @@ absl::Status GetDatabasePaths(
   return absl::OkStatus();
 }
 
-absl::Status IndexTileTypes(
+static absl::Status IndexTileTypes(
   const std::filesystem::path &database_path,
   absl::flat_hash_map<std::string, TileTypeDatabasePaths>
     &tile_types_database_paths) {
@@ -256,7 +256,7 @@ absl::Status IndexTileTypes(
   return absl::OkStatus();
 }
 
-absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
+static absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
   const TileTypeDatabasePaths &paths) {
   SegmentsBitsWithPseudoPIPs out;
   // Parse pseudo pips db.
@@ -290,7 +290,7 @@ absl::StatusOr<SegmentsBitsWithPseudoPIPs> ParseTileTypeDatabase(
   return out;
 }
 
-absl::StatusOr<fpga::BanksTilesRegistry> CreateBanksRegistry(
+static absl::StatusOr<fpga::BanksTilesRegistry> CreateBanksRegistry(
   const fpga::Part &part, const fpga::TileGrid &grid,
   const std::filesystem::path &package_pins_path) {
   // Parse package pins.
@@ -507,7 +507,7 @@ absl::Status PartDatabase::ConfigBits(const std::string &tile_name,
         continue;
       }
       return absl::InvalidArgumentError(absl::StrFormat(
-        "no configuration bits for feature \"%s\" on tile \"%s\"", feature,
+        R"(no configuration bits for feature "%s" on tile "%s")", feature,
         tile_name));
     }
     for (const auto &segbit : feature_it->second) {

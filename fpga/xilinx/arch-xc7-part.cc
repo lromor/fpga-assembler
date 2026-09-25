@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "absl/container/btree_map.h"
@@ -78,7 +79,7 @@ std::optional<FrameAddress> ConfigurationColumn::GetNextFrameAddress(
     return {};
   }
 
-  if (static_cast<unsigned int>(address.minor() + 1) < frame_count_) {
+  if (std::cmp_less(address.minor() + 1, frame_count_)) {
     return FrameAddress(static_cast<uint32_t>(address) + 1);
   }
 

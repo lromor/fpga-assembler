@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -101,8 +102,8 @@ class BitstreamReader {
 template <Architecture Arch>
 void BitstreamReader<Arch>::PrintFpgaConfigurationLogicData(FILE *aux_fp) {
   // Get the data before the first FDRI_WRITE command packet
-  const auto fpga_conf_end = std::search(words_.cbegin(), words_.cend(),
-                                         kWcfgCmd.cbegin(), kWcfgCmd.cend());
+  const auto fpga_conf_end = std::ranges::search(words_,
+                                         kWcfgCmd);
   fprintf(aux_fp, "FPGA configuration logic prefix:");
   for (auto it = words_.cbegin(); it != fpga_conf_end; ++it) {
     fprintf(aux_fp, " %08X", *it);
@@ -110,8 +111,8 @@ void BitstreamReader<Arch>::PrintFpgaConfigurationLogicData(FILE *aux_fp) {
   fprintf(aux_fp, "\n");
 
   // Get the data after the last Null Command packet
-  const auto last_null_cmd = std::find_end(words_.cbegin(), words_.cend(),
-                                           kNullCmd.cbegin(), kNullCmd.cend());
+  const auto last_null_cmd = std::ranges::find_end(words_,
+                                           kNullCmd);
   fprintf(aux_fp, "FPGA configuration logic suffix:");
   for (auto it = last_null_cmd; it != words_.cend(); ++it) {
     fprintf(aux_fp, " %08X", *it);

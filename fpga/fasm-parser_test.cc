@@ -25,7 +25,7 @@
 using fasm::ParseResult;
 
 // Make ParseResult printable so that we can use it in test outputs.
-std::ostream &operator<<(std::ostream &o, fasm::ParseResult r) {
+static std::ostream &operator<<(std::ostream &o, fasm::ParseResult r) {
   switch (r) {
   case fasm::ParseResult::kSuccess: return o << "Success";
   case fasm::ParseResult::kInfo: return o << "Info";
@@ -55,7 +55,7 @@ struct ValueTestCase {
   uint64_t bits;
 };
 
-void ValueParseTest() {
+static void ValueParseTest() {
   std::cout << "\n-- Value parse test -- \n";
   constexpr ValueTestCase tests[] = {
     // Names
@@ -187,7 +187,7 @@ struct LongValueTestCase {
   std::vector<Chunk> chunks;
 };
 
-void LongValueParseTest() {
+static void LongValueParseTest() {
   std::cout << "\n-- Value parse test -- \n";
   const LongValueTestCase tests[] = {
     // Names
@@ -248,7 +248,7 @@ struct AnnotationTestCase {
   // Expected outputs
   std::vector<std::pair<std::string_view, std::string_view>> annotations;
 };
-void AnnotationParseTest() {
+static void AnnotationParseTest() {
   std::cout << "\n-- Annotation parse test -- \n";
   const AnnotationTestCase tests[] = {
     // Simple, multi name=value pair

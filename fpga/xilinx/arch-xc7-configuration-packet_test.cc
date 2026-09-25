@@ -21,7 +21,7 @@ namespace xilinx {
 namespace xc7 {
 constexpr FrameWord kType1NOP = bit_field_set<FrameWord>(0, 31, 29, 0x1);
 
-constexpr FrameWord MakeType1(const int opcode, const int address,
+static constexpr FrameWord MakeType1(const int opcode, const int address,
                               const int word_count) {
   return bit_field_set<FrameWord>(
     bit_field_set<FrameWord>(
@@ -31,7 +31,7 @@ constexpr FrameWord MakeType1(const int opcode, const int address,
     10, 0, word_count);
 }
 
-constexpr FrameWord MakeType2(const int opcode, const int word_count) {
+static constexpr FrameWord MakeType2(const int opcode, const int word_count) {
   return bit_field_set<FrameWord>(
     bit_field_set<FrameWord>(bit_field_set<FrameWord>(0x0, 31, 29, 0x2), 28, 27,
                              opcode),

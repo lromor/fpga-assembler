@@ -590,7 +590,7 @@ bool IsValidPackagePinCSVHeader(const std::vector<std::string> &segments) {
 std::vector<std::string> StripAsciiWhitespaces(
   const std::vector<std::string> &src) {
   std::vector<std::string> out;
-  std::transform(src.begin(), src.end(), std::back_inserter(out),
+  std::ranges::transform(src, std::back_inserter(out),
                  [](const std::string &s) -> std::string {
                    return std::string(absl::StripAsciiWhitespace(s));
                  });
