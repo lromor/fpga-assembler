@@ -20,10 +20,34 @@ first parse off the first page load.
 ## What it shows
 
 The canvas draws the fabric as prjxray's tile grid lays it out: one cell per
-tile, coloured by what the tile is, with the interconnect and the scaffolding
-dimmed so the columns of logic, memory, DSP and IO stand out. A resolved FASM
-line rings the tiles it touches and draws crosshairs through them, so a single
-changed tile is findable at full-die zoom.
+tile at its `grid_x`, `grid_y`. Each tile type gets its own shade of its
+category's colour, so the dozen kinds of interconnect and the half dozen
+kinds of CLB are told apart without losing the category at a glance; tiles
+with no configuration bits of their own are dimmed, because they are the
+scaffolding between the columns that do the work. The panel on the left
+lists every tile type in the part with its count, and clicking one isolates
+it. Zoom in far enough and the tiles label themselves -- the type first,
+then the full name once the cell is wide enough to hold it without running
+into its neighbour.
+
+A resolved FASM line rings the tiles it touches and draws crosshairs through
+them, so a single changed tile is findable at full-die zoom.
+
+### Three coordinate systems
+
+The one thing worth knowing before reading a fabric is that a tile has
+three sets of numbers, and they do not agree:
+
+  * **grid** (`grid_x`, `grid_y` in `tilegrid.json`) is the position on the
+    die, unique per tile. It is what this viewer draws.
+  * **the tile name** (`CLBLM_R_X33Y38`) is numbered within the tile type,
+    so types reuse each other's indices: on `xc7a50t`, `X0Y0` names five
+    different tiles, among them `INT_L_X0Y0` and `LIOB33_SING_X0Y0`.
+  * **the site name** (`SLICE_X52Y38`) is numbered within the site type
+    across the whole device. `CLBLM_R_X33Y38` holds `SLICE_X52Y38` and
+    `SLICE_X53Y38`: the Y agrees with the tile, the X does not.
+
+Selecting a tile spells its three out.
 
 The inset in the corner is the selected tile's own window into the bitstream:
 one column per frame, one row per bit, over the rectangle `tilegrid.json`
@@ -34,9 +58,11 @@ half clears is a feature that half works.
 The panel on the right spells the same thing out in words: the tile, its
 sites, its bit window, and per feature the frame address, word and bit of
 every bit that moved. A LUT `INIT` also gets its 64 bits drawn out, and an
-interconnect feature is named the way the database means it -- prjxray writes
-a pip as `destination.source`, which is the one piece of the notation a
-reader is likely to have backwards.
+interconnect feature is named the way the database means it -- prjxray
+writes a pip as `destination.source`, because the database stores a block of
+bits per destination signal and one pattern within it per source that can
+drive it, which is the one piece of the notation a reader is likely to have
+backwards.
 
 ## How it is put together
 
@@ -51,7 +77,13 @@ viewer/static/   the page around the canvas
 The point of the C ABI is that nothing here re-implements the database. A
 FASM line entered in the browser is resolved by `fpga::PartDatabase::
 ConfigBits` -- the same call `//fpga:fpga-as` makes to assemble a bitstream --
-so what the viewer draws is what the assembler would write. `fpga/ffi`
+so the bits the viewer draws for a line are the bits the assembler would set
+for it.
+
+It is not a whole assembly, and does not claim to be. `fpga-as` also injects
+the configuration the reference implementation adds around a design (see
+`fpga/injected-features.h`) and pads out every frame of a touched bit block;
+the viewer shows what the lines in front of you do, and nothing else. `fpga/ffi`
 exposes `fpga_view_abi_sizeof` for exactly this reason: the hand-written Rust
 binding asserts its struct layouts against the C++ ones the first time a
 handle is opened, rather than trusting that the two descriptions of the same

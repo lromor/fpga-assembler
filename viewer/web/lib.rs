@@ -25,26 +25,20 @@ pub fn start() {
     let _ = console_log::init_with_level(log::Level::Info);
 }
 
-/// The palette the fabric is drawn with, as `[{label, color}]`, so the page
-/// can render a legend that cannot drift from the renderer.
+/// The categories the fabric is coloured by, as `[{label, color}]`.
 #[wasm_bindgen]
 pub fn legend() -> Result<JsValue, JsValue> {
     let entries: Vec<_> = palette::legend()
         .into_iter()
-        .map(|(label, color)| {
-            serde_json::json!({
-                "label": label,
-                // Back to sRGB bytes for CSS.
-                "color": format!(
-                    "#{:02x}{:02x}{:02x}",
-                    (color[0].sqrt() * 255.0).round() as u8,
-                    (color[1].sqrt() * 255.0).round() as u8,
-                    (color[2].sqrt() * 255.0).round() as u8,
-                ),
-            })
-        })
+        .map(
+            |(label, color)| serde_json::json!({ "label": label, "color": palette::to_css(color) }),
+        )
         .collect();
-    serde_json::to_string(&entries)
+    to_json(&entries)
+}
+
+fn to_json<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
+    serde_json::to_string(value)
         .map(|json| JsValue::from_str(&json))
         .map_err(|error| JsValue::from_str(&error.to_string()))
 }
@@ -265,6 +259,97 @@ impl Viewer {
 
     pub fn tile_name(&self, index: u32) -> Option<String> {
         self.scene.tile_name(index).map(str::to_owned)
+    }
+
+    /// Every tile type in the loaded part, with the colour it is drawn in
+    /// and the category it belongs to: the page's legend, built from the
+    /// same table the renderer uses so the two cannot disagree.
+    pub fn tile_types(&self) -> Result<JsValue, JsValue> {
+        let Some(grid) = self.scene.grid() else {
+            return to_json(&Vec::<u8>::new());
+        };
+        let colors = self.scene.type_colors();
+        let mut counts = vec![0u32; grid.tile_types.len()];
+        for &index in &grid.tile_type {
+            if let Some(count) = counts.get_mut(index as usize) {
+                *count += 1;
+            }
+        }
+        let entries: Vec<_> = grid
+            .tile_types
+            .iter()
+            .enumerate()
+            .map(|(index, name)| {
+                serde_json::json!({
+                    "index": index,
+                    "name": name,
+                    "kind": palette::kind_of(name).label(),
+                    "color": palette::to_css(
+                        colors.get(index).copied().unwrap_or([0.5, 0.5, 0.5, 1.0]),
+                    ),
+                    "count": counts.get(index).copied().unwrap_or(0),
+                })
+            })
+            .collect();
+        to_json(&entries)
+    }
+
+    /// Draws only this tile type at full strength. Pass no index to show
+    /// the whole fabric again.
+    pub fn set_type_filter(&mut self, tile_type: Option<u32>) {
+        if self.scene.type_filter() == tile_type {
+            return;
+        }
+        self.scene.set_type_filter(tile_type);
+        // The dimming is baked into the tile colours rather than layered on
+        // top, so the fabric is rebuilt here instead of every frame.
+        self.fabric.clear();
+        self.scene.fabric_instances(&mut self.fabric);
+    }
+
+    /// The name and type of a tile.
+    pub fn tile_info(&self, index: u32) -> Result<JsValue, JsValue> {
+        let Some(name) = self.scene.tile_name(index) else {
+            return Ok(JsValue::NULL);
+        };
+        let (_, tile_type) = self.scene.tile_type_of(index).unwrap_or((0, ""));
+        to_json(&serde_json::json!({ "name": name, "type": tile_type }))
+    }
+
+    /// Where to put a label for each visible tile whose cell has room for
+    /// one, in physical canvas pixels, and which of its two lines fit.
+    ///
+    /// `char_px` is the advance width of the label font and `type_ratio`
+    /// how much narrower its second line is, both measured by the page.
+    pub fn labels(
+        &self,
+        char_px: f32,
+        type_ratio: f32,
+        device_pixel_ratio: f32,
+    ) -> Result<JsValue, JsValue> {
+        // Past a few hundred the labels are unreadable anyway, and this
+        // bounds the work done per frame while panning.
+        const MAX_LABELS: usize = 400;
+        let labels = self.scene.labels(
+            &self.camera,
+            self.viewport(),
+            MAX_LABELS,
+            char_px,
+            type_ratio,
+            device_pixel_ratio,
+        );
+        let entries: Vec<_> = labels
+            .iter()
+            .map(|label| {
+                serde_json::json!({
+                    "x": label.x,
+                    "y": label.y,
+                    "name": if label.show_name { label.name } else { "" },
+                    "type": if label.show_type { label.tile_type } else { "" },
+                })
+            })
+            .collect();
+        to_json(&entries)
     }
 
     /// Rebuilds the bit window's rectangles from the current focus.

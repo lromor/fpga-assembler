@@ -103,8 +103,62 @@ pub fn kind_of(tile_type: &str) -> Kind {
     Kind::Structure
 }
 
-pub fn color_of(tile_type: &str) -> Color {
-    kind_of(tile_type).color()
+/// Colours for a whole set of tile types.
+///
+/// A category colour alone is not enough to read the fabric: a part has a
+/// dozen kinds of interconnect and half a dozen kinds of CLB, and drawn in
+/// one flat blue they are a wall. Each type gets its own shade of its
+/// category's colour, spread evenly across the types that share the
+/// category, so the family is still legible at a glance and the individual
+/// columns are still told apart.
+///
+/// The spread is by sorted name rather than by order of appearance, so a
+/// type keeps its shade no matter what order the grid lists tiles in.
+pub fn colors_for_types(tile_types: &[String]) -> Vec<Color> {
+    // Position of each type within its category, by name.
+    let mut by_kind: std::collections::HashMap<&str, Vec<(&str, usize)>> =
+        std::collections::HashMap::new();
+    for (index, name) in tile_types.iter().enumerate() {
+        by_kind
+            .entry(kind_of(name).label())
+            .or_default()
+            .push((name.as_str(), index));
+    }
+
+    let mut colors = vec![[0.5, 0.5, 0.5, 1.0]; tile_types.len()];
+    for group in by_kind.values_mut() {
+        group.sort_unstable();
+        let total = group.len();
+        for (position, &(name, index)) in group.iter().enumerate() {
+            let base = kind_of(name).color();
+            // Evenly spaced brightness, centred on the category colour. A
+            // lone type in its category keeps that colour exactly.
+            let factor = if total <= 1 {
+                1.0
+            } else {
+                let t = position as f32 / (total - 1) as f32;
+                0.62 + t * 0.76
+            };
+            colors[index] = [
+                (base[0] * factor).clamp(0.0, 1.0),
+                (base[1] * factor).clamp(0.0, 1.0),
+                (base[2] * factor).clamp(0.0, 1.0),
+                1.0,
+            ];
+        }
+    }
+    colors
+}
+
+/// A linear colour as the `#rrggbb` the page needs for a swatch.
+pub fn to_css(color: Color) -> String {
+    let channel = |value: f32| (value.sqrt() * 255.0).round().clamp(0.0, 255.0) as u8;
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        channel(color[0]),
+        channel(color[1]),
+        channel(color[2])
+    )
 }
 
 /// Every kind with its label and colour, for the legend the page draws.

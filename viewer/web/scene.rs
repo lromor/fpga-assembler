@@ -71,35 +71,57 @@ pub struct Touched {
 }
 
 /// Everything the renderer draws, derived from what the server sent.
+/// A tile label the page draws over the canvas, in physical canvas pixels.
+///
+/// The two lines are reported separately because they fit at different
+/// zooms: a tile is legible as `CLBLL_L` well before there is room for
+/// `CLBLL_L_X16Y118`.
+pub struct Label<'a> {
+    pub x: f32,
+    pub y: f32,
+    pub name: &'a str,
+    pub tile_type: &'a str,
+    pub show_name: bool,
+    pub show_type: bool,
+}
+
 pub struct Scene {
     grid: Option<Grid>,
+    /// One colour per tile type, not per tile: the page shows the same
+    /// table as a legend, so the two cannot disagree.
+    type_colors: Vec<[f32; 4]>,
     colors: Vec<[f32; 4]>,
     by_cell: HashMap<(u32, u32), u32>,
     touched: Vec<Touched>,
     selected: Option<u32>,
     focus: Option<TileDetail>,
+    /// When set, only tiles of this type are drawn at full strength.
+    type_filter: Option<u32>,
 }
 
 impl Scene {
     pub fn new() -> Self {
         Scene {
             grid: None,
+            type_colors: Vec::new(),
             colors: Vec::new(),
             by_cell: HashMap::new(),
             touched: Vec::new(),
             selected: None,
             focus: None,
+            type_filter: None,
         }
     }
 
     pub fn set_grid(&mut self, grid: Grid) {
+        self.type_colors = palette::colors_for_types(&grid.tile_types);
         self.colors = grid
             .tile_type
             .iter()
             .map(|&index| {
-                grid.tile_types
+                self.type_colors
                     .get(index as usize)
-                    .map(|name| palette::color_of(name))
+                    .copied()
                     .unwrap_or([0.5, 0.5, 0.5, 1.0])
             })
             .collect();
@@ -113,7 +135,111 @@ impl Scene {
         self.touched.clear();
         self.selected = None;
         self.focus = None;
+        self.type_filter = None;
         self.grid = Some(grid);
+    }
+
+    /// The colour each tile type is drawn in.
+    pub fn type_colors(&self) -> &[[f32; 4]] {
+        &self.type_colors
+    }
+
+    /// Draws only this tile type at full strength, or all of them.
+    pub fn set_type_filter(&mut self, tile_type: Option<u32>) {
+        self.type_filter = tile_type;
+    }
+
+    pub fn type_filter(&self) -> Option<u32> {
+        self.type_filter
+    }
+
+    /// The type index and name of a tile.
+    pub fn tile_type_of(&self, index: u32) -> Option<(u32, &str)> {
+        let grid = self.grid.as_ref()?;
+        let type_index = *grid.tile_type.get(index as usize)?;
+        Some((
+            type_index,
+            grid.tile_types.get(type_index as usize)?.as_str(),
+        ))
+    }
+
+    /// The visible tiles whose cells have room for a label, and which of
+    /// the two lines fits.
+    ///
+    /// A label is included only when the text is narrower than the cell it
+    /// names. Gating on zoom alone is not enough: `INT_L_X16Y118` needs
+    /// half again the width of `CLBLM_L`, so at any one zoom some names fit
+    /// and others would run into the neighbouring tile.
+    ///
+    /// `char_px` is the advance width of the label font in CSS pixels, and
+    /// `type_ratio` how much narrower the second line is. The page measures
+    /// both, because it owns the stylesheet.
+    pub fn labels(
+        &self,
+        camera: &Camera2d,
+        viewport: Viewport,
+        max: usize,
+        char_px: f32,
+        type_ratio: f32,
+        device_pixel_ratio: f32,
+    ) -> Vec<Label<'_>> {
+        let Some(grid) = &self.grid else {
+            return Vec::new();
+        };
+        // The camera works in physical pixels; the font is measured in CSS
+        // pixels, so the cell has to be expressed the same way.
+        let cell = camera.zoom / device_pixel_ratio.max(0.1);
+        // Room for two stacked lines of the label font.
+        const TWO_LINES: f32 = 26.0;
+        // Leave a little air so neighbouring labels do not touch.
+        let budget = cell * 0.9;
+        if char_px <= 0.0 || budget < char_px * 3.0 {
+            return Vec::new();
+        }
+
+        let top_left = camera.world_at(viewport, 0.0, 0.0);
+        let bottom_right = camera.world_at(viewport, viewport.width, viewport.height);
+
+        let mut out = Vec::new();
+        for index in 0..grid.len() {
+            let (x, y) = (grid.x[index] as f32, grid.y[index] as f32);
+            if x + 1.0 < top_left[0]
+                || x > bottom_right[0]
+                || y + 1.0 < top_left[1]
+                || y > bottom_right[1]
+            {
+                continue;
+            }
+            let Some(name) = grid.names.get(index) else {
+                continue;
+            };
+            let tile_type = grid
+                .tile_type
+                .get(index)
+                .and_then(|&t| grid.tile_types.get(t as usize))
+                .map(String::as_str)
+                .unwrap_or("");
+
+            let show_name = name.len() as f32 * char_px <= budget;
+            let show_type = !tile_type.is_empty()
+                && tile_type.len() as f32 * char_px * type_ratio <= budget
+                && (!show_name || cell >= TWO_LINES);
+            if !show_name && !show_type {
+                continue;
+            }
+            out.push(Label {
+                x: (x + 0.5 - camera.center[0]) * camera.zoom + viewport.width / 2.0,
+                y: (y + 0.5 - camera.center[1]) * camera.zoom + viewport.height / 2.0,
+                name,
+                tile_type,
+                show_name,
+                show_type,
+            });
+            if out.len() >= max {
+                break;
+            }
+        }
+        out
     }
 
     pub fn grid(&self) -> Option<&Grid> {
@@ -193,6 +319,14 @@ impl Scene {
                 // Tiles with no bits of their own recede: they are the
                 // scaffolding between the columns that do the work.
                 color = [color[0] * 0.55, color[1] * 0.55, color[2] * 0.55, 1.0];
+            }
+            // Isolating a type pushes every other tile down to a backdrop,
+            // which is the quickest way to see where one type actually sits.
+            if self
+                .type_filter
+                .is_some_and(|filter| grid.tile_type[index] != filter)
+            {
+                color = [color[0] * 0.18, color[1] * 0.18, color[2] * 0.18, 1.0];
             }
             out.push(Instance::new(
                 grid.x[index] as f32 + GAP,

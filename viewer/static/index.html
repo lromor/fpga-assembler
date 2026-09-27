@@ -49,13 +49,28 @@
         </section>
 
         <section>
-          <h2>Legend</h2>
+          <h2>Tile types</h2>
+          <input
+            id="type-search"
+            type="search"
+            placeholder="filter by name&hellip;"
+            spellcheck="false"
+          />
+          <p class="caption hint-line">
+            click a type to isolate it on the fabric
+          </p>
+          <ul id="tile-types" class="tile-types"></ul>
+        </section>
+
+        <section>
+          <h2>Categories</h2>
           <ul id="legend" class="legend"></ul>
         </section>
       </aside>
 
       <section class="stage">
         <canvas id="canvas"></canvas>
+        <div id="labels" class="labels"></div>
         <div id="tooltip" class="tooltip" hidden></div>
         <div class="stage-hint">
           drag to pan &middot; wheel to zoom &middot; click a tile to open its

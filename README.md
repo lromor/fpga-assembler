@@ -79,9 +79,9 @@ bazel run -c opt //viewer/server -- \
   --preload=artix7/xc7a35tcsg324-1
 ```
 
-It resolves a line through the assembler's own database, over the C ABI in
-`fpga/ffi`, so what it draws is what `fpga-as` would write. See
-[viewer/README.md](./viewer/README.md).
+It resolves each line through the assembler's own database, over the C ABI
+in `fpga/ffi`, so the bits it shows for a line are the bits `fpga-as` would
+set for it. See [viewer/README.md](./viewer/README.md).
 
 [fasm-spec]: https://fasm.readthedocs.io/en/stable/#
 [bazel]: https://bazel.build/

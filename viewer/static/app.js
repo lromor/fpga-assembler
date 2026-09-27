@@ -22,6 +22,9 @@ const dom = {
   parseStatus: document.getElementById("parse-status"),
   examples: document.getElementById("examples"),
   legend: document.getElementById("legend"),
+  tileTypes: document.getElementById("tile-types"),
+  typeSearch: document.getElementById("type-search"),
+  labels: document.getElementById("labels"),
   canvas: document.getElementById("canvas"),
   tooltip: document.getElementById("tooltip"),
   stageStatus: document.getElementById("stage-status"),
@@ -33,6 +36,10 @@ const state = {
   families: [],
   family: null,
   part: null,
+  // Every tile type of the loaded part, as the renderer colours them.
+  tileTypes: [],
+  typeFilter: null,
+  charWidth: 0,
   needsRender: true,
 };
 
@@ -141,6 +148,49 @@ function populateParts() {
   );
 }
 
+/** The legend of tile types actually present in the loaded part. Clicking
+ *  one isolates it on the fabric, which is the quickest way to see where a
+ *  type sits. */
+function renderTileTypes() {
+  const needle = dom.typeSearch.value.trim().toUpperCase();
+  const shown = state.tileTypes.filter(
+    (entry) => !needle || entry.name.includes(needle),
+  );
+  dom.tileTypes.replaceChildren(
+    ...shown.map((entry) => {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute(
+        "aria-pressed",
+        String(state.typeFilter === entry.index),
+      );
+      button.title = `${entry.name} \u2014 ${entry.kind}, ${entry.count} tiles`;
+
+      const swatch = document.createElement("span");
+      swatch.className = "swatch";
+      swatch.style.background = entry.color;
+
+      const name = element("span", "name", entry.name);
+      const count = element("span", "count", String(entry.count));
+
+      button.append(swatch, name, count);
+      button.addEventListener("click", () => {
+        // Clicking the isolated type again shows the whole fabric.
+        state.typeFilter =
+          state.typeFilter === entry.index ? null : entry.index;
+        state.viewer.set_type_filter(
+          state.typeFilter === null ? undefined : state.typeFilter,
+        );
+        renderTileTypes();
+        requestRender();
+      });
+      item.append(button);
+      return item;
+    }),
+  );
+}
+
 async function loadPart() {
   const family = dom.family.value;
   const part = dom.part.value;
@@ -157,8 +207,15 @@ async function loadPart() {
     resizeCanvas();
     state.viewer.fit();
     const grid = JSON.parse(body);
+    state.typeFilter = null;
+    state.tileTypes = JSON.parse(state.viewer.tile_types()).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
+    renderTileTypes();
     setStageStatus(
-      `${part} · ${grid.names.length} tiles · ${grid.width}×${grid.height}`,
+      `${part} · ${grid.names.length} tiles · ` +
+        `${state.tileTypes.length} tile types · ` +
+        `grid ${grid.width}×${grid.height}`,
     );
     requestRender();
   } catch (error) {
@@ -237,14 +294,21 @@ function element(tag, className, text) {
 const OUTCOME_TEXT = {
   bits: "sets configuration bits",
   pseudo_pip:
-    "a pseudo pip: the database documents this as wiring that is always " +
-    "there, so it configures no bits",
-  zero_value: "assigned zero, so it addresses no feature bit",
+    "a pseudo pip: Vivado reports this connection as a pip, but the " +
+    "database records no configuration bits for it, so the bitstream does " +
+    "not change. A pseudo pip is a wire that is always connected, the " +
+    "default driver of a net when nothing else drives it, or a hint to the " +
+    "router that two outputs carry the same value.",
+  zero_value:
+    "the assignment is zero, and only a bit set to one addresses a feature, " +
+    "so nothing is looked up",
   error: "not in the database",
 };
 
-/** prjxray names an interconnect feature `<destination>.<source>`, which is
- *  the one piece of the notation a reader is likely to have backwards. */
+/** prjxray names an interconnect feature `<destination>.<source>`: the
+ *  database stores a block of bits per destination signal, and one pattern
+ *  within it per source that can drive it. It is the one piece of the
+ *  notation a reader is likely to have backwards. */
 function routingOf(feature) {
   const parts = feature.tile_feature.split(".");
   if (parts.length !== 2) return null;
@@ -287,10 +351,11 @@ function renderLut(feature, lut) {
     element(
       "p",
       "explain",
-      `This line addresses INIT[${end - 1}:${start}]. A lit square is a 1 ` +
-        `the line writes; an outlined square is a bit it addresses. Each ` +
-        `1 is looked up in the tile type's segbits as ` +
-        `${feature.tile_type}.${feature.tile_feature}[<bit>].`,
+      `This line addresses INIT[${end - 1}:${start}], the outlined ` +
+        `squares. A lit square is a bit the line sets to 1; each one is ` +
+        `looked up in the tile type's segbits as ` +
+        `${feature.tile_type}.${feature.tile_feature}[<bit>]. Bits outside ` +
+        `the range are left as whatever else in the design set them.`,
     ),
   );
   return section;
@@ -364,8 +429,9 @@ function renderFeature(feature) {
       document.createTextNode(" → "),
       element("strong", null, routing.destination),
       document.createTextNode(
-        ". The bits below are the mux select for that leg: every one of " +
-          "them, set and cleared alike, has to match.",
+        ". The bits below are the pattern that selects that source. All of " +
+          "them count: a bit the database marks with a leading ! has to be " +
+          "clear, not merely left alone.",
       ),
     );
     body.append(explain);
@@ -410,10 +476,47 @@ function renderTileCard(detail) {
   if (detail.tile.clock_region) {
     tags.append(element("span", "tag", `region ${detail.tile.clock_region}`));
   }
-  tags.append(
-    element("span", "tag", `x${detail.tile.grid_x} y${detail.tile.grid_y}`),
-  );
   body.append(tags);
+
+  // The three coordinate spaces are the single most confusing thing about
+  // reading a fabric, so the tile spells its own out.
+  body.append(element("p", "caption", "coordinates"));
+  const coords = document.createElement("table");
+  const nameXY = detail.tile.name.match(/_X(\d+)Y(\d+)$/);
+  const rows = [
+    [
+      "grid",
+      `${detail.tile.grid_x}, ${detail.tile.grid_y}`,
+      "position on the die; what this viewer draws",
+    ],
+  ];
+  if (nameXY) {
+    rows.push([
+      "tile name",
+      `X${nameXY[1]}Y${nameXY[2]}`,
+      "numbered within this tile type, so other types reuse it",
+    ]);
+  }
+  if (detail.sites.length > 0) {
+    const siteXY = detail.sites[0].name.match(/_X(\d+)Y(\d+)$/);
+    if (siteXY) {
+      rows.push([
+        "site",
+        `X${siteXY[1]}Y${siteXY[2]}`,
+        "numbered within the site type, across the whole device",
+      ]);
+    }
+  }
+  for (const [label, value, note] of rows) {
+    const row = document.createElement("tr");
+    row.append(
+      element("td", null, label),
+      element("td", "coord", value),
+      element("td", "note", note),
+    );
+    coords.append(row);
+  }
+  body.append(coords);
 
   if (detail.sites.length > 0) {
     body.append(element("p", "caption", "sites"));
@@ -459,8 +562,10 @@ function renderTileCard(detail) {
       element(
         "p",
         "explain",
-        "The inset draws that window: one column per frame, one row per " +
-          "bit. A lit cell is a bit the FASM line drives.",
+        "The inset draws this window: one column per frame, one row per " +
+          "bit, starting at the offset above. A lit cell is a bit the FASM " +
+          "line drives. A tile with blocks on two buses shows the one the " +
+          "resolved bits landed on.",
       ),
     );
   }
@@ -550,16 +655,64 @@ function showTooltip(event, point) {
     dom.tooltip.hidden = true;
     return;
   }
-  const name = state.viewer.tile_name(index);
-  if (!name) {
+  const info = JSON.parse(state.viewer.tile_info(index) ?? "null");
+  if (!info) {
     dom.tooltip.hidden = true;
     return;
   }
-  dom.tooltip.textContent = name;
+  dom.tooltip.replaceChildren(
+    document.createTextNode(info.name),
+    element("span", "dim", `  ${info.type}`),
+  );
   dom.tooltip.hidden = false;
   const rect = dom.canvas.getBoundingClientRect();
   dom.tooltip.style.left = `${event.clientX - rect.left + 14}px`;
   dom.tooltip.style.top = `${event.clientY - rect.top + 14}px`;
+}
+
+/** The advance width of one character of the label font, in CSS pixels.
+ *  The renderer needs it to decide whether a name fits in its cell, and
+ *  only the page knows what the stylesheet ended up using. */
+function labelCharWidth() {
+  if (state.charWidth) return state.charWidth;
+  const probe = document.createElement("span");
+  probe.textContent = "M".repeat(40);
+  probe.style.cssText =
+    "position:absolute;visibility:hidden;white-space:pre;" +
+    "font-family:var(--mono);font-size:10px";
+  dom.labels.append(probe);
+  const width = probe.getBoundingClientRect().width / 40;
+  probe.remove();
+  // Fall back to a sane monospace advance if the measurement is unusable,
+  // which happens when the element is not laid out yet.
+  state.charWidth = width > 0.5 ? width : 6;
+  return state.charWidth;
+}
+
+/** Tile names, drawn as HTML over the canvas. The renderer returns only the
+ *  labels whose text fits the cell it names, so they never overrun into the
+ *  neighbouring tile; a cell too small for the full name may still get the
+ *  tile type on its own. */
+function renderLabels() {
+  const entries = JSON.parse(
+    // The type line is 9px against the name's 10px.
+    state.viewer.labels(labelCharWidth(), 0.9, window.devicePixelRatio || 1),
+  );
+  if (entries.length === 0) {
+    if (dom.labels.childElementCount > 0) dom.labels.replaceChildren();
+    return;
+  }
+  const ratio = window.devicePixelRatio || 1;
+  dom.labels.replaceChildren(
+    ...entries.map((entry) => {
+      const span = document.createElement("span");
+      span.style.left = `${entry.x / ratio}px`;
+      span.style.top = `${entry.y / ratio}px`;
+      if (entry.name) span.append(document.createTextNode(entry.name));
+      if (entry.type) span.append(element("em", null, entry.type));
+      return span;
+    }),
+  );
 }
 
 function frame() {
@@ -569,6 +722,7 @@ function frame() {
       // A resize can leave the surface without a frame to draw into; the
       // renderer says so instead of leaving a stale or blank canvas.
       if (!state.viewer.render()) state.needsRender = true;
+      renderLabels();
     } catch (error) {
       setStageStatus(`render failed: ${error}`);
     }
@@ -602,6 +756,7 @@ async function main() {
       requestRender();
     }
   });
+  dom.typeSearch.addEventListener("input", renderTileTypes);
   dom.load.addEventListener("click", loadPart);
   dom.resolve.addEventListener("click", resolve);
   dom.clear.addEventListener("click", () => {
