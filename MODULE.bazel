@@ -12,3 +12,131 @@ bazel_dep(name = "rules_license", version = "1.0.0")
 
 # compilation DB; build_cleaner
 bazel_dep(name = "bant", version = "0.3.3")
+
+# Rust rules for the fabric viewer (//viewer).
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_rust", version = "0.74.0")
+bazel_dep(name = "rules_rust_wasm_bindgen", version = "0.74.0")
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2024",
+    extra_target_triples = ["wasm32-unknown-unknown"],
+    versions = ["1.90.0"],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+# Third party crates for the viewer, resolved by crate_universe from the
+# specs below.  Repin with:
+#   CARGO_BAZEL_REPIN=1 bazel mod deps
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.spec(
+    package = "axum",
+    version = "0.8",
+)
+crate.spec(
+    features = [
+        "derive",
+        "env",
+    ],
+    package = "clap",
+    version = "4",
+)
+crate.spec(
+    features = ["derive"],
+    package = "serde",
+    version = "1",
+)
+crate.spec(
+    package = "serde_json",
+    version = "1",
+)
+crate.spec(
+    features = [
+        "macros",
+        "net",
+        "rt-multi-thread",
+        "signal",
+    ],
+    package = "tokio",
+    version = "1",
+)
+crate.spec(
+    features = [
+        "fs",
+        "set-header",
+        "trace",
+    ],
+    package = "tower-http",
+    version = "0.6",
+)
+crate.spec(
+    package = "tracing",
+    version = "0.1",
+)
+crate.spec(
+    features = ["env-filter"],
+    package = "tracing-subscriber",
+    version = "0.3",
+)
+crate.spec(
+    features = ["derive"],
+    package = "bytemuck",
+    version = "1",
+)
+crate.spec(
+    package = "console_error_panic_hook",
+    version = "0.1",
+)
+crate.spec(
+    package = "console_log",
+    version = "1",
+)
+crate.spec(
+    package = "js-sys",
+    version = "0.3",
+)
+crate.spec(
+    package = "log",
+    version = "0.4",
+)
+
+# Pinned: wasm-bindgen refuses to run against a CLI of a different version,
+# and rules_rust_wasm_bindgen 0.74.0 ships the 0.2.121 CLI.
+crate.spec(
+    package = "wasm-bindgen",
+    version = "=0.2.121",
+)
+crate.spec(
+    package = "wasm-bindgen-futures",
+    version = "0.4",
+)
+crate.spec(
+    package = "web-sys",
+    version = "0.3",
+)
+crate.spec(
+    features = ["webgl"],
+    package = "wgpu",
+    version = "30",
+)
+
+# web-sys gates every DOM type behind a feature, and a type's feature does
+# not imply the features of the types it inherits from.  HtmlCanvasElement
+# needs the whole chain up to EventTarget, or the generated bindings do not
+# compile.
+crate.annotation(
+    crate = "web-sys",
+    crate_features = [
+        "Document",
+        "Element",
+        "EventTarget",
+        "HtmlCanvasElement",
+        "Node",
+        "Window",
+    ],
+)
+crate.from_specs(name = "viewer_crates")
+use_repo(crate, "viewer_crates")

@@ -96,8 +96,12 @@
                 registry = pkgs.fetchFromGitHub {
                   owner = "bazelbuild";
                   repo = "bazel-central-registry";
-                  rev = "6873d34b26b6b294a80c7e4bd2cda1926fdfcc4d";
-                  hash = "sha256-iMjT8jar5x2JYl9OJoGrjljxtK0elwMsOYa1xnNVe6M=";
+                  # Carries rules_rust and rules_rust_wasm_bindgen 0.74.0,
+                  # which the //viewer fabric viewer needs.  Bazel resolves
+                  # the whole module graph even for a scoped target pattern,
+                  # so a registry without them fails the build outright.
+                  rev = "48352a005a8cfa8eb288afdeeb310668319dc9e9";
+                  hash = "sha256-XPCIsYHfn9D77wizIvK9DZd0ekzSxSOZPhTXP3JvFuc=";
                 };
 
                 repoCache = pkgs.stdenv.mkDerivation {
@@ -115,7 +119,7 @@
                   # Trigger a build to get the new hash for the targeted repository cache
                   outputHash =
                     {
-                      x86_64-linux = "sha256-+m6lY9af3oZ4X5ZpcB8moql87YxbDJX1x5dYBwQjE8M=";
+                      x86_64-linux = "sha256-Qyg5aIwRQrJrLtClAgMonfLxLHLm4JmMUnjPw3V+Pqk=";
                     }
                     .${system} or (throw "No hash for system: ${system}");
 
@@ -125,8 +129,13 @@
                     export GIT_SSL_CAINFO="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
                     export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
 
-                    # Analyzing //... ensures we download test deps like googletest
-                    bazel build //... \
+                    # Analyzing //fpga/... ensures we download test deps like
+                    # googletest.  The tree is deliberately not //...: the
+                    # //viewer fabric viewer would drag a Rust toolchain and
+                    # its crate universe into this fixed-output derivation,
+                    # and the flake exists to package fpga-as.  The viewer is
+                    # built and tested by the Bazel CI instead.
+                    bazel build //fpga/... \
                       --nobuild \
                       --registry=file://${registry} \
                       --repository_cache=$out \
@@ -191,7 +200,7 @@
                   patchShebangs "$BAZEL_INSTALL_BASE"
 
                   # 3. Now run the tests
-                  bazel test //... \
+                  bazel test //fpga/... \
                     -c opt \
                     --registry=file://${registry} \
                     --repository_cache=$(pwd)/repo_cache \

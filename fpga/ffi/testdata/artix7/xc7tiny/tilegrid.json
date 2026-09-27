@@ -1,0 +1,73 @@
+{
+    "BRAM_L_X0Y1": {
+        "bits": {
+            "BLOCK_RAM": {
+                "baseaddr": "0x00c00000",
+                "frames": 128,
+                "offset": 0,
+                "words": 10
+            },
+            "CLB_IO_CLK": {
+                "baseaddr": "0x00400300",
+                "frames": 28,
+                "offset": 0,
+                "words": 10
+            }
+        },
+        "clock_region": "X0Y0",
+        "grid_x": 1,
+        "grid_y": 0,
+        "pin_functions": {},
+        "prohibited_sites": [],
+        "sites": {
+            "RAMB18_X0Y0": "RAMB18E1"
+        },
+        "type": "BRAM_L"
+    },
+    "CLBLM_R_X1Y0": {
+        "bits": {
+            "CLB_IO_CLK": {
+                "baseaddr": "0x00401080",
+                "frames": 36,
+                "offset": 77,
+                "words": 2
+            }
+        },
+        "clock_region": "X0Y0",
+        "grid_x": 2,
+        "grid_y": 1,
+        "pin_functions": {},
+        "prohibited_sites": [],
+        "sites": {
+            "SLICE_X0Y0": "SLICEM",
+            "SLICE_X1Y0": "SLICEL"
+        },
+        "type": "CLBLM_R"
+    },
+    "INT_L_X0Y0": {
+        "bits": {
+            "CLB_IO_CLK": {
+                "baseaddr": "0x00401000",
+                "frames": 28,
+                "offset": 77,
+                "words": 2
+            }
+        },
+        "clock_region": "X0Y0",
+        "grid_x": 0,
+        "grid_y": 1,
+        "pin_functions": {},
+        "prohibited_sites": [],
+        "sites": {},
+        "type": "INT_L"
+    },
+    "NULL_X0Y0": {
+        "bits": {},
+        "grid_x": 0,
+        "grid_y": 0,
+        "pin_functions": {},
+        "prohibited_sites": [],
+        "sites": {},
+        "type": "NULL"
+    }
+}

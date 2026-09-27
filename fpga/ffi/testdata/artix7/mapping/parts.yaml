@@ -1,0 +1,4 @@
+xc7tiny-test-1:
+  device: xc7tiny
+  package: test
+  speedgrade: '1'

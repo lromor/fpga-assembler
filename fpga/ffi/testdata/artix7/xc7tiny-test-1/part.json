@@ -1,0 +1,52 @@
+{
+    "global_clock_regions": {
+        "bottom": {
+            "rows": {
+                "0": {
+                    "configuration_buses": {
+                        "BLOCK_RAM": {
+                            "configuration_columns": {
+                                "0": {
+                                    "frame_count": 128
+                                }
+                            }
+                        },
+                        "CLB_IO_CLK": {
+                            "configuration_columns": {
+                                "0": {
+                                    "frame_count": 36
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "top": {
+            "rows": {
+                "0": {
+                    "configuration_buses": {
+                        "BLOCK_RAM": {
+                            "configuration_columns": {
+                                "0": {
+                                    "frame_count": 128
+                                }
+                            }
+                        },
+                        "CLB_IO_CLK": {
+                            "configuration_columns": {
+                                "0": {
+                                    "frame_count": 36
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "idcode": 56807571,
+    "iobanks": {
+        "0": "X0Y0"
+    }
+}

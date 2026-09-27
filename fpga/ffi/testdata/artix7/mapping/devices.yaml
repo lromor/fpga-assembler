@@ -1,0 +1,3 @@
+# device to fabric mapping
+"xc7tiny":
+  fabric: "xc7tiny"
