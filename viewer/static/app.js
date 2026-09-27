@@ -479,7 +479,14 @@ function installPointerHandlers() {
     dragging = true;
     moved = 0;
     last = canvasPoint(event);
-    dom.canvas.setPointerCapture(event.pointerId);
+    try {
+      // Keeps a drag alive when the pointer leaves the canvas. Not every
+      // pointer can be captured, and a drag that cannot be captured still
+      // works, so this must not abort the handler.
+      dom.canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Ignored on purpose; see above.
+    }
     dom.canvas.classList.add("dragging");
   });
 

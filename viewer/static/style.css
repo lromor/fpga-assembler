@@ -265,6 +265,14 @@ canvas.dragging {
   bottom: 12px;
 }
 
+kbd {
+  font-family: var(--mono);
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--ink-dim);
+}
+
 .stage-status {
   top: 12px;
 }
