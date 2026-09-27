@@ -10,6 +10,7 @@ filegroup(
     srcs = [
         "app.js",
         "index.html",
+        "reference.js",
         "style.css",
     ],
 )

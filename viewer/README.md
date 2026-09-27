@@ -64,6 +64,32 @@ bits per destination signal and one pattern within it per source that can
 drive it, which is the one piece of the notation a reader is likely to have
 backwards.
 
+## Reference
+
+The right panel has a Reference tab. It explains how a FASM line turns into
+frame bits. It also gives a glossary of the 7-series terms the rest of the
+viewer uses: tile, tile type, site, interconnect tile, PIP, pseudo PIP,
+frame, word, frame address, configuration bus, column, segment, bit block,
+segbits file, LUT and INIT, clock region, the three sets of coordinates,
+and FASM. A term in a resolved feature links into it, so "pseudo PIP" in a
+result is one click from what a pseudo PIP is.
+
+The text follows ASD-STE100 Simplified Technical English: short sentences,
+plain words, and one name for one thing. The viewer used to say "inset" and
+"bit window", which it never defined. The square in the corner is now just
+that, and the part of the bitstream that belongs to a tile is a **bit
+block**, after the `bits` entry in `tilegrid.json` and `BitsBlock` in the
+C++.
+
+The knowledge comes from [Project X-Ray][prjxray]. It documented the
+7-series bitstream format and it makes the database this tool reads. The
+wording here is this repository's own. Every number was checked two times:
+against that documentation, and against the code here. The frame address
+was checked against `fpga/xilinx/arch-xc7-frame.h`. The feature lookup was
+checked against `fpga/database.cc`. Project X-Ray uses the ISC license, and
+`fpga/xilinx/` carries code from it under that license. The content lives
+in `viewer/static/reference.js`, apart from the code that draws it.
+
 ## How it is put together
 
 ```
@@ -115,3 +141,5 @@ The Nix flake packages `fpga-as` and deliberately builds only `//fpga/...`:
 putting the viewer in it would pull a Rust toolchain and the whole crate
 universe into a fixed-output derivation. The viewer is built and tested by
 the Bazel CI instead.
+
+[prjxray]: https://github.com/f4pga/prjxray

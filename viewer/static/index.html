@@ -21,7 +21,7 @@
         <button id="load" type="button">Load</button>
       </div>
       <p class="tagline">
-        Resolved by the assembler's own database, through
+        This viewer reads the database of the assembler, through
         <code>//fpga/ffi</code>.
       </p>
     </header>
@@ -57,7 +57,7 @@
             spellcheck="false"
           />
           <p class="caption hint-line">
-            click a type to isolate it on the fabric
+            click a type to show only that type
           </p>
           <ul id="tile-types" class="tile-types"></ul>
         </section>
@@ -73,22 +73,48 @@
         <div id="labels" class="labels"></div>
         <div id="tooltip" class="tooltip" hidden></div>
         <div class="stage-hint">
-          drag to pan &middot; wheel to zoom &middot; click a tile to open its
-          bit window &middot; <kbd>f</kbd> to fit
+          drag to pan &middot; wheel to zoom &middot; click a tile to see its
+          bits &middot; <kbd>f</kbd> to fit
         </div>
         <div id="stage-status" class="stage-status">loading&hellip;</div>
       </section>
 
       <aside class="panel panel-right">
-        <section>
-          <h2>What this changes</h2>
+        <div class="tabs" role="tablist">
+          <button
+            id="tab-changes"
+            class="tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="pane-changes"
+          >
+            What this changes
+          </button>
+          <button
+            id="tab-reference"
+            class="tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="pane-reference"
+          >
+            Reference
+          </button>
+        </div>
+
+        <section id="pane-changes" role="tabpanel">
           <div id="decode" class="decode">
             <p class="empty">
-              Enter a FASM line and press Resolve. The tiles it touches are
-              ringed on the fabric, and the bits it drives are lit in the
-              tile's bit window.
+              Type a FASM line and click Resolve. The viewer draws a ring
+              around each tile that changes. It also lights the bits that
+              change, in the square in the corner.
             </p>
           </div>
+        </section>
+
+        <section id="pane-reference" role="tabpanel" hidden>
+          <div id="reference" class="reference"></div>
         </section>
       </aside>
     </main>

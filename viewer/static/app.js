@@ -4,6 +4,7 @@
 // a bit position.
 
 import init, { create_viewer, legend } from "./bundle.js";
+import { PIPELINE, SOURCES, TERMS } from "./reference.js";
 
 const EXAMPLES = [
   "CLBLM_R_X33Y38.SLICEM_X0.ALUT.INIT[63:32]=32'b00000000000000000000000000000100",
@@ -25,6 +26,11 @@ const dom = {
   tileTypes: document.getElementById("tile-types"),
   typeSearch: document.getElementById("type-search"),
   labels: document.getElementById("labels"),
+  tabChanges: document.getElementById("tab-changes"),
+  tabReference: document.getElementById("tab-reference"),
+  paneChanges: document.getElementById("pane-changes"),
+  paneReference: document.getElementById("pane-reference"),
+  reference: document.getElementById("reference"),
   canvas: document.getElementById("canvas"),
   tooltip: document.getElementById("tooltip"),
   stageStatus: document.getElementById("stage-status"),
@@ -254,7 +260,7 @@ async function resolve() {
       diagnostics || `parsed: ${evaluation.severity}`,
       evaluation.severity === "error",
     );
-    // Open the first tile that actually changed, so the bit window is
+    // Open the first tile that actually changed, so the bit block is
     // showing the thing the line did without a second click.
     const first = evaluation.features.find(
       (feature) => feature.outcome === "bits" && feature.tile,
@@ -292,17 +298,14 @@ function element(tag, className, text) {
 }
 
 const OUTCOME_TEXT = {
-  bits: "sets configuration bits",
+  bits: "This line sets configuration bits.",
   pseudo_pip:
-    "a pseudo pip: Vivado reports this connection as a pip, but the " +
-    "database records no configuration bits for it, so the bitstream does " +
-    "not change. A pseudo pip is a wire that is always connected, the " +
-    "default driver of a net when nothing else drives it, or a hint to the " +
-    "router that two outputs carry the same value.",
+    "This is a pseudo PIP. Vivado shows it as a PIP, but the database has " +
+    "no configuration bits for it. The bitstream does not change.",
   zero_value:
-    "the assignment is zero, and only a bit set to one addresses a feature, " +
-    "so nothing is looked up",
-  error: "not in the database",
+    "The value is zero. Only a bit that is 1 selects a feature bit, so the " +
+    "tool reads nothing.",
+  error: "The database does not have this feature.",
 };
 
 /** prjxray names an interconnect feature `<destination>.<source>`: the
@@ -351,11 +354,11 @@ function renderLut(feature, lut) {
     element(
       "p",
       "explain",
-      `This line addresses INIT[${end - 1}:${start}], the outlined ` +
-        `squares. A lit square is a bit the line sets to 1; each one is ` +
-        `looked up in the tile type's segbits as ` +
+      `This line covers INIT[${end - 1}:${start}]. Those are the squares ` +
+        `with an outline. A bright square is a bit that the line sets to ` +
+        `1. The tool reads each one from the segbits file, as ` +
         `${feature.tile_type}.${feature.tile_feature}[<bit>]. Bits outside ` +
-        `the range are left as whatever else in the design set them.`,
+        `the range keep their earlier value.`,
     ),
   );
   return section;
@@ -413,7 +416,12 @@ function renderFeature(feature) {
   tags.append(element("span", "tag", `line ${feature.line}`));
   body.append(tags);
 
-  body.append(element("p", "explain", OUTCOME_TEXT[feature.outcome] ?? ""));
+  const explain = element("p", "explain", OUTCOME_TEXT[feature.outcome] ?? "");
+  if (feature.outcome === "pseudo_pip") {
+    explain.append(document.createTextNode(" "));
+    explain.append(termLink("pseudo-pip", "What is a pseudo pip?"));
+  }
+  body.append(explain);
   if (feature.error) {
     body.append(element("p", "explain", feature.error));
   }
@@ -422,16 +430,17 @@ function renderFeature(feature) {
   if (routing) {
     const explain = element("p", "explain");
     explain.append(
-      document.createTextNode("Interconnect. The database writes a pip as "),
+      document.createTextNode("Interconnect. The database writes a "),
+      termLink("pip", "pip"),
+      document.createTextNode(" as "),
       element("strong", null, "destination.source"),
       document.createTextNode(", so this routes "),
       element("strong", null, routing.source),
       document.createTextNode(" → "),
       element("strong", null, routing.destination),
       document.createTextNode(
-        ". The bits below are the pattern that selects that source. All of " +
-          "them count: a bit the database marks with a leading ! has to be " +
-          "clear, not merely left alone.",
+        ". The bits below are the pattern that selects that source. All " +
+          "of them are important. A bit with a ! in front must be 0.",
       ),
     );
     body.append(explain);
@@ -441,7 +450,9 @@ function renderFeature(feature) {
   if (lut) body.append(renderLut(feature, lut));
 
   if (feature.frame_bits.length > 0) {
-    body.append(element("p", "caption", "frame bits"));
+    const caption = element("p", "caption");
+    caption.append(termLink("frame-address", "frame bits"));
+    body.append(caption);
     body.append(renderBitsTable(feature));
   }
   card.append(body);
@@ -454,9 +465,9 @@ function renderDecode(evaluation) {
       element(
         "p",
         "empty",
-        "Enter a FASM line and press Resolve. The tiles it touches are " +
-          "ringed on the fabric, and the bits it drives are lit in the " +
-          "tile's bit window.",
+        "Type a FASM line and click Resolve. The viewer draws a ring " +
+          "around each tile that changes. It also lights the bits that " +
+          "change, in the square in the corner.",
       ),
     );
     return;
@@ -480,21 +491,23 @@ function renderTileCard(detail) {
 
   // The three coordinate spaces are the single most confusing thing about
   // reading a fabric, so the tile spells its own out.
-  body.append(element("p", "caption", "coordinates"));
+  const coordCaption = element("p", "caption");
+  coordCaption.append(termLink("coordinates", "coordinates"));
+  body.append(coordCaption);
   const coords = document.createElement("table");
   const nameXY = detail.tile.name.match(/_X(\d+)Y(\d+)$/);
   const rows = [
     [
       "grid",
       `${detail.tile.grid_x}, ${detail.tile.grid_y}`,
-      "position on the die; what this viewer draws",
+      "the place on the chip. This viewer draws it.",
     ],
   ];
   if (nameXY) {
     rows.push([
       "tile name",
       `X${nameXY[1]}Y${nameXY[2]}`,
-      "numbered within this tile type, so other types reuse it",
+      "counted inside this tile type. Other types use the same numbers.",
     ]);
   }
   if (detail.sites.length > 0) {
@@ -503,7 +516,7 @@ function renderTileCard(detail) {
       rows.push([
         "site",
         `X${siteXY[1]}Y${siteXY[2]}`,
-        "numbered within the site type, across the whole device",
+        "counted inside the site type, across the whole chip.",
       ]);
     }
   }
@@ -534,12 +547,14 @@ function renderTileCard(detail) {
       element(
         "p",
         "explain",
-        "This tile has no configuration bits of its own, so there is no " +
-          "bit window to show.",
+        "This tile has no configuration bits. There is no bit block to " +
+          "show.",
       ),
     );
   } else {
-    body.append(element("p", "caption", "bit window"));
+    const windowCaption = element("p", "caption");
+    windowCaption.append(termLink("bit-block", "bit block"));
+    body.append(windowCaption);
     const table = document.createElement("table");
     const head = document.createElement("tr");
     for (const label of ["bus", "base", "frames", "offset", "words"]) {
@@ -562,15 +577,120 @@ function renderTileCard(detail) {
       element(
         "p",
         "explain",
-        "The inset draws this window: one column per frame, one row per " +
-          "bit, starting at the offset above. A lit cell is a bit the FASM " +
-          "line drives. A tile with blocks on two buses shows the one the " +
-          "resolved bits landed on.",
+        "The square in the corner of the fabric draws this bit block. " +
+          "It has one column for each frame and one row for each bit. " +
+          "The first row is the offset above. A bright cell is a bit that " +
+          "the line sets. A tile with two bit blocks shows the block that " +
+          "holds the bits.",
       ),
     );
   }
   card.append(body);
   dom.decode.prepend(card);
+}
+
+/* ---------- the reference ---------- */
+
+/** Renders one block of reference content. Everything is inserted as text,
+ *  never as markup. */
+function renderBlock(block) {
+  if (block.p) return element("p", null, block.p);
+  if (block.code) return element("pre", null, block.code);
+  if (block.list) {
+    const list = document.createElement("ul");
+    list.append(...block.list.map((item) => element("li", null, item)));
+    return list;
+  }
+  if (block.table) {
+    const table = document.createElement("table");
+    const head = document.createElement("tr");
+    head.append(...block.table.head.map((cell) => element("th", null, cell)));
+    table.append(head);
+    for (const cells of block.table.rows) {
+      const row = document.createElement("tr");
+      row.append(...cells.map((cell) => element("td", null, cell)));
+      table.append(row);
+    }
+    return table;
+  }
+  if (block.links) {
+    const list = element("ul", "sources-list");
+    for (const [label, href] of block.links) {
+      const item = document.createElement("li");
+      const link = element("a", null, label);
+      link.href = href;
+      link.target = "_blank";
+      link.rel = "noreferrer noopener";
+      item.append(link);
+      list.append(item);
+    }
+    return list;
+  }
+  return document.createTextNode("");
+}
+
+/** A link into the reference, for use from the decode panel. */
+function termLink(id, text) {
+  const link = element("a", "term", text);
+  link.addEventListener("click", () => showTerm(id));
+  return link;
+}
+
+/** Opens the reference at one term. */
+function showTerm(id) {
+  selectTab("reference");
+  const entry = document.getElementById(`term-${id}`);
+  if (!entry) return;
+  entry.scrollIntoView({ block: "start", behavior: "smooth" });
+  // A brief highlight, so it is clear which entry was jumped to.
+  entry.classList.add("flash");
+  setTimeout(() => entry.classList.remove("flash"), 1600);
+}
+
+function selectTab(which) {
+  const reference = which === "reference";
+  dom.tabChanges.setAttribute("aria-selected", String(!reference));
+  dom.tabReference.setAttribute("aria-selected", String(reference));
+  dom.paneChanges.hidden = reference;
+  dom.paneReference.hidden = !reference;
+}
+
+function renderReference() {
+  const byId = new Map(TERMS.map((term) => [term.id, term]));
+  const nodes = [];
+
+  const pipeline = element("div", "entry");
+  pipeline.id = `term-${PIPELINE.id}`;
+  pipeline.append(element("h3", null, PIPELINE.title));
+  pipeline.append(...PIPELINE.body.map(renderBlock));
+  nodes.push(pipeline);
+
+  for (const term of TERMS) {
+    const entry = element("div", "entry");
+    entry.id = `term-${term.id}`;
+    entry.append(element("h3", null, term.term));
+    if (term.aka) entry.append(element("p", "aka", term.aka.join(" · ")));
+    entry.append(...term.body.map(renderBlock));
+    if (term.see) {
+      const see = element("p", "see");
+      see.append(document.createTextNode("See also: "));
+      term.see.forEach((id, index) => {
+        if (index > 0) see.append(document.createTextNode(", "));
+        const target = byId.get(id);
+        see.append(termLink(id, target ? target.term.toLowerCase() : id));
+      });
+      entry.append(see);
+    }
+    nodes.push(entry);
+  }
+
+  const sources = element("div", "entry");
+  sources.id = `term-${SOURCES.id}`;
+  sources.append(element("h3", null, SOURCES.title));
+  sources.append(...SOURCES.body.map(renderBlock));
+  nodes.push(sources);
+
+  dom.reference.replaceChildren(...nodes);
 }
 
 /* ---------- interaction ---------- */
@@ -739,6 +859,9 @@ async function main() {
     return;
   }
   renderLegend();
+  renderReference();
+  dom.tabChanges.addEventListener("click", () => selectTab("changes"));
+  dom.tabReference.addEventListener("click", () => selectTab("reference"));
   resizeCanvas();
   try {
     state.viewer = await create_viewer(dom.canvas);

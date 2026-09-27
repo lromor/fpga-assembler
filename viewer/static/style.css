@@ -527,3 +527,140 @@ a.tile-link {
   text-decoration: none;
   border-bottom: 1px dotted currentColor;
 }
+
+/* ---------- the right panel's tabs and reference ---------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--panel-edge);
+  margin: -14px -14px 0;
+  padding: 0 8px;
+  position: sticky;
+  top: -14px;
+  background: var(--panel);
+  z-index: 1;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 9px 10px;
+  font-family: var(--sans);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-faint);
+}
+
+.tab:hover {
+  color: var(--ink-dim);
+  background: none;
+}
+
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.reference {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  line-height: 1.65;
+}
+
+.reference h3 {
+  font-size: 13px;
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.reference .aka {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin: -6px 0 8px;
+}
+
+.reference p {
+  margin: 0 0 8px;
+  color: var(--ink-dim);
+}
+
+.reference ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: var(--ink-dim);
+}
+
+.reference li {
+  margin-bottom: 6px;
+}
+
+.reference pre {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: #0e1015;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.reference table {
+  margin-bottom: 10px;
+}
+
+.reference td:first-child {
+  font-family: var(--mono);
+  color: var(--ink);
+  white-space: nowrap;
+  vertical-align: top;
+  padding-right: 10px;
+}
+
+.reference td:not(:first-child) {
+  font-family: var(--sans);
+  vertical-align: top;
+}
+
+.reference .entry {
+  scroll-margin-top: 44px;
+}
+
+.reference .entry.flash h3 {
+  color: var(--accent);
+}
+
+.reference .see {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+.reference .sources-list {
+  list-style: none;
+  padding: 0;
+}
+
+a.term,
+.reference a {
+  color: var(--accent-cool);
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+  cursor: pointer;
+}
+
+a.term:hover,
+.reference a:hover {
+  color: var(--ink);
+}
