@@ -20,7 +20,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "fpga/xilinx/arch-types.h"
 #include "fpga/xilinx/big-endian-span.h"
@@ -73,7 +72,7 @@ class BitstreamReader {
   // Construct a `BitstreamReader` from a Container of bytes.
   // Any bytes preceding an initial sync word are ignored.
   template <typename T>
-  static absl::optional<BitstreamReader<Arch>> InitWithBytes(T bitstream);
+  static std::optional<BitstreamReader<Arch>> InitWithBytes(T bitstream);
 
   // Extract information from bitstream necessary to reconstruct RBT
   // header and add it to the AUX data
@@ -102,19 +101,17 @@ class BitstreamReader {
 template <Architecture Arch>
 void BitstreamReader<Arch>::PrintFpgaConfigurationLogicData(FILE *aux_fp) {
   // Get the data before the first FDRI_WRITE command packet
-  const auto fpga_conf_end = std::ranges::search(words_,
-                                         kWcfgCmd);
+  const auto fpga_conf_end = std::ranges::search(words_, kWcfgCmd);
   fprintf(aux_fp, "FPGA configuration logic prefix:");
-  for (auto it = words_.cbegin(); it != fpga_conf_end; ++it) {
+  for (auto it = words_.cbegin(); it != fpga_conf_end.begin(); ++it) {
     fprintf(aux_fp, " %08X", *it);
   }
   fprintf(aux_fp, "\n");
 
   // Get the data after the last Null Command packet
-  const auto last_null_cmd = std::ranges::find_end(words_,
-                                           kNullCmd);
+  const auto last_null_cmd = std::ranges::find_end(words_, kNullCmd);
   fprintf(aux_fp, "FPGA configuration logic suffix:");
-  for (auto it = last_null_cmd; it != words_.cend(); ++it) {
+  for (auto it = last_null_cmd.begin(); it != words_.cend(); ++it) {
     fprintf(aux_fp, " %08X", *it);
   }
   fprintf(aux_fp, "\n");
@@ -144,7 +141,7 @@ void BitstreamReader<Arch>::PrintHeader(T bitstream, FILE *aux_fp) {
 
 template <Architecture Arch>
 template <typename T>
-absl::optional<BitstreamReader<Arch>> BitstreamReader<Arch>::InitWithBytes(
+std::optional<BitstreamReader<Arch>> BitstreamReader<Arch>::InitWithBytes(
   T bitstream) {
   using bitstream_value_type = const T::value_type;
   using words_value_type = ArchType::FrameWords::value_type;
@@ -154,7 +151,7 @@ absl::optional<BitstreamReader<Arch>> BitstreamReader<Arch>::InitWithBytes(
   auto sync_pos = std::search(bitstream.begin(), bitstream.end(),
                               kSyncWord.begin(), kSyncWord.end());
   if (sync_pos == bitstream.end()) {
-    return absl::optional<BitstreamReader<Arch>>();
+    return std::optional<BitstreamReader<Arch>>();
   }
   sync_pos += kSyncWord.size();
 

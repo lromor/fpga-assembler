@@ -169,7 +169,7 @@ using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
       }                                                                     \
   }                                                                         \
   if ((v).empty()) (v).emplace_back();                                      \
-  std::reverse((v).begin(), (v).end());
+  std::ranges::reverse(v);
 
 inline ParseResult Parse(std::string_view content, FILE *errstream,
                          const ParseCallback &parse_callback,

@@ -104,7 +104,7 @@ class Configuration {
 
 template <Architecture Arch>
 template <typename Collection>
-absl::optional<Configuration<Arch>> Configuration<Arch>::InitWithPackets(
+std::optional<Configuration<Arch>> Configuration<Arch>::InitWithPackets(
   const Part &part, Collection &packets) {
   // Registers that can be directly written to.
   uint32_t command_register = 0;
