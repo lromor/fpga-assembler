@@ -245,7 +245,6 @@ cc_library(
     deps = [
         ":arch-types",
         ":big-endian-span",
-        "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
     ],
 )

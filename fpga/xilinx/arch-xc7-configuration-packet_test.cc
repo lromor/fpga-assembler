@@ -22,7 +22,7 @@ namespace xc7 {
 constexpr FrameWord kType1NOP = bit_field_set<FrameWord>(0, 31, 29, 0x1);
 
 static constexpr FrameWord MakeType1(const int opcode, const int address,
-                              const int word_count) {
+                                     const int word_count) {
   return bit_field_set<FrameWord>(
     bit_field_set<FrameWord>(
       bit_field_set<FrameWord>(bit_field_set<FrameWord>(0x0, 31, 29, 0x1), 28,
