@@ -92,128 +92,96 @@
             # Package fpga-assembler.
             packages.default =
               let
-                src = pkgs.nix-gitignore.gitignoreSourcePure [ ] ./.;
+                # The older buildBazelPackage helper is incompatible with Bazel 8.
+                bazelDerivation = pkgs.callPackage (
+                  nixpkgs + "/pkgs/by-name/ba/bazel_8/build-support/bazelDerivation.nix"
+                ) { };
                 registry = pkgs.fetchFromGitHub {
                   owner = "bazelbuild";
                   repo = "bazel-central-registry";
                   rev = "6873d34b26b6b294a80c7e4bd2cda1926fdfcc4d";
                   hash = "sha256-iMjT8jar5x2JYl9OJoGrjljxtK0elwMsOYa1xnNVe6M=";
                 };
-
-                repoCache = pkgs.stdenv.mkDerivation {
-                  name = "fpga-as-repo-cache";
-                  inherit src;
-
-                  nativeBuildInputs = [
-                    pkgs.bazel_8
-                    pkgs.git
-                    pkgs.cacert
-                  ];
-
-                  outputHashMode = "recursive";
-                  outputHashAlgo = "sha256";
-                  # Trigger a build to get the new hash for the targeted repository cache
-                  outputHash =
-                    {
-                      x86_64-linux = "sha256-+m6lY9af3oZ4X5ZpcB8moql87YxbDJX1x5dYBwQjE8M=";
-                    }
-                    .${system} or (throw "No hash for system: ${system}");
-
-                  buildPhase = ''
-                    export HOME=$(mktemp -d)
-                    export USER="nix"
-                    export GIT_SSL_CAINFO="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-                    export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-
-                    # Analyzing //... ensures we download test deps like googletest
-                    bazel build //... \
-                      --nobuild \
-                      --registry=file://${registry} \
-                      --repository_cache=$out \
-                      --curses=no \
-                      --jobs=$NIX_BUILD_CORES
+                common = {
+                  src = pkgs.nix-gitignore.gitignoreSourcePure [ ] ./.;
+                  bazel = pkgs.bazel_8;
+                  inherit registry;
+                  targets = [ "//..." ];
+                  nativeBuildInputs = [ pkgs.git ];
+                  env.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+                  bazelPreBuild = ''
+                    echo "build --jobs=$NIX_BUILD_CORES" >> .bazelrc
                   '';
-                  installPhase = "true"; # Output is already generated directly into $out
-                  dontFixup = true;
                 };
-
+                repoCache = bazelDerivation (
+                  common
+                  // {
+                    name = "fpga-as-repo-cache";
+                    command = "build";
+                    commandArgs = [
+                      "--nobuild"
+                      "--repository_cache=repo_cache"
+                    ];
+                    installPhase = ''
+                      mkdir -p "$out"
+                      cp -r repo_cache "$out/repo_cache"
+                    '';
+                    dontFixup = true;
+                    outputHashMode = "recursive";
+                    outputHashAlgo = "sha256";
+                    outputHash =
+                      {
+                        x86_64-linux = "sha256-ysf1IEOVgxkjAokq2/IUb6IEJj0aCVzWsoRoeHnoiyE=";
+                      }
+                      .${system} or (throw "No hash for system: ${system}");
+                  }
+                );
               in
-              pkgs.stdenv.mkDerivation {
-                pname = "fpga-as";
-                version = "0.0.1";
-                inherit src;
+              bazelDerivation (
+                common
+                // {
+                  pname = "fpga-as";
+                  version = "0.0.1";
+                  bazelRepoCache = repoCache;
+                  targets = [ "//fpga:fpga-as" ];
+                  command = "build";
+                  commandArgs = [
+                    "-c"
+                    "opt"
+                    "--spawn_strategy=standalone"
+                  ];
+                  postPatch = ''
+                    patchShebangs scripts/create-workspace-status.sh
+                  '';
+                  doCheck = true;
+                  checkPhase = ''
+                    runHook preCheck
 
-                nativeBuildInputs = with pkgs; [
-                  jdk
-                  git
-                  bash
-                  bazel_8
-                  xorg.lndir # Required for the cache linking
-                ];
+                    # Bazel's bundled test scripts need Nix interpreter paths.
+                    installBase=$(${pkgs.bazel_8}/bin/bazel --batch info install_base)
+                    patchShebangs "$installBase"
+                    ${pkgs.bazel_8}/bin/bazel --batch test //... -c opt \
+                      --registry=file://${registry} \
+                      --repository_cache=repo_cache \
+                      --spawn_strategy=standalone \
+                      --test_output=errors
 
-                postPatch = ''
-                  patchShebangs scripts/create-workspace-status.sh
-                '';
+                    runHook postCheck
+                  '';
+                  installPhase = ''
+                    runHook preInstall
+                    install -D --strip bazel-bin/fpga/fpga-as "$out/bin/fpga-as"
+                    runHook postInstall
+                  '';
 
-                preBuild = ''
-                  export HOME=$(mktemp -d)
-                  # Tell Bazel where the Nix bash is
-                  export BAZEL_SH="${pkgs.bash}/bin/bash"
-
-                  mkdir repo_cache
-                  lndir -silent ${repoCache} repo_cache
-                '';
-                buildPhase = ''
-                  runHook preBuild
-
-                  bazel build //fpga:fpga-as \
-                    -c opt \
-                    --registry=file://${registry} \
-                    --repository_cache=$(pwd)/repo_cache \
-                    --spawn_strategy=standalone \
-                    --curses=no \
-                    --jobs=$NIX_BUILD_CORES
-
-                  runHook postBuild
-                '';
-
-                doCheck = true;
-
-                checkPhase = ''
-                  runHook preCheck
-
-                  # 1. Force Bazel to unpack its internal tools into the cache
-                  BAZEL_INSTALL_BASE=$(bazel info install_base \
-                    --registry=file://${registry} \
-                    --repository_cache=$(pwd)/repo_cache)
-
-                  # 2. Just patch shebang!
-                  patchShebangs "$BAZEL_INSTALL_BASE"
-
-                  # 3. Now run the tests
-                  bazel test //... \
-                    -c opt \
-                    --registry=file://${registry} \
-                    --repository_cache=$(pwd)/repo_cache \
-                    --test_output=errors \
-                    --spawn_strategy=standalone \
-                    --curses=no \
-                    --jobs=$NIX_BUILD_CORES
-                  runHook postCheck
-                '';
-                installPhase = ''
-                  runHook preInstall
-                  install -D --strip bazel-bin/fpga/fpga-as "$out/bin/fpga-as"
-                  runHook postInstall
-                '';
-
-                meta = {
-                  description = "Tool to convert FASM to FPGA bitstream.";
-                  homepage = "https://github.com/lromor/fpga-assembler";
-                  license = pkgs.lib.licenses.asl20;
-                  platforms = pkgs.lib.platforms.linux;
-                };
-              };
+                  meta = {
+                    description = "Tool to convert FASM to FPGA bitstream.";
+                    homepage = "https://github.com/lromor/fpga-assembler";
+                    license = pkgs.lib.licenses.asl20;
+                    platforms = pkgs.lib.platforms.linux;
+                  };
+                }
+              );
           };
       };
 }
