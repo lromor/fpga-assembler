@@ -15,10 +15,10 @@
 #include <cstdint>
 #include <iomanip>
 #include <ios>
+#include <optional>
 #include <ostream>
 #include <utility>
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace fpga {
@@ -33,7 +33,7 @@ enum class ConfigurationPacketType : uint32_t { kNONE, kTYPE1, kTYPE2 };
 template <typename ConfigRegType, typename Derived>
 class ConfigurationPacketBase {
  public:
-  using ParseResult = std::pair<absl::Span<uint32_t>, absl::optional<Derived>>;
+  using ParseResult = std::pair<absl::Span<uint32_t>, std::optional<Derived>>;
 
   // Opcodes as specified in UG470 page 108
   enum class Opcode {

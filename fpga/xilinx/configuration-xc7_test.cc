@@ -12,11 +12,11 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "absl/log/check.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "fpga/database-parsers.h"
 #include "fpga/memory-mapped-file.h"
@@ -284,7 +284,7 @@ TEST(XC7ConfigurationTest, CheckForPaddingFrames) {
     FrameAddress(xc7::BlockType::kBlockRam, false, 0, 0, 0),
     FrameAddress(xc7::BlockType::kBlockRam, false, 1, 0, 0)};
 
-  auto test_part = absl::optional<Part>(Part(0x1234, test_part_addresses));
+  auto test_part = std::optional<Part>(Part(0x1234, test_part_addresses));
 
   Frames<kArch> frames;
   frames.GetFrames().emplace(FrameAddress(test_part_addresses.at(0)),

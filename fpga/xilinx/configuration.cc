@@ -11,9 +11,9 @@
 #include "fpga/xilinx/configuration.h"
 
 #include <cstdint>
+#include <optional>
 
 #include "absl/log/check.h"
-#include "absl/types/optional.h"
 #include "fpga/xilinx/arch-types.h"
 #include "fpga/xilinx/arch-xc7-configuration-packet.h"
 #include "fpga/xilinx/configuration-packet.h"
@@ -23,7 +23,7 @@ namespace xilinx {
 template <>
 void Configuration<Architecture::kXC7>::CreateConfigurationPackage(
   ConfigurationPackage &out_packets, const PacketData &packet_data,
-  absl::optional<Part> &part) {
+  std::optional<Part> &part) {
   // Initialization sequence
   out_packets.emplace_back(new NopPacket<ConfigurationPacket>());
   out_packets.emplace_back(
