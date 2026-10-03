@@ -85,10 +85,7 @@ cc_library(
     hdrs = [
         "configuration-packet.h",
     ],
-    deps = [
-        "@abseil-cpp//absl/types:optional",
-        "@abseil-cpp//absl/types:span",
-    ],
+    deps = ["@abseil-cpp//absl/types:span"],
 )
 
 cc_library(
@@ -203,7 +200,6 @@ cc_library(
         ":configuration-packet",
         "@abseil-cpp//absl/container:btree",
         "@abseil-cpp//absl/log:check",
-        "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
     ],
 )
@@ -230,7 +226,6 @@ cc_test(
         "//fpga:memory-mapped-file",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
@@ -279,7 +274,6 @@ cc_library(
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",
-        "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
     ],
 )

@@ -20,6 +20,7 @@
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,7 +28,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "fpga/xilinx/arch-types.h"
 #include "fpga/xilinx/arch-xc7-configuration-packet.h"
@@ -53,7 +53,7 @@ class BitstreamWriter {
   using packets_t = std::vector<std::unique_ptr<ConfigurationPacket>>;
   using BitstreamHeader = std::vector<uint8_t>;
   // Only defined if a packet exists
-  using op_data_t = absl::optional<absl::Span<const uint32_t>>;
+  using op_data_t = std::optional<absl::Span<const uint32_t>>;
   using data_iterator_t = absl::Span<const uint32_t>::iterator;
   using itr_value_type = uint32_t;
 
@@ -118,7 +118,7 @@ class BitstreamWriter {
    protected:
     explicit iterator(header_t::iterator itr_header, const packets_t &packets,
                       typename packets_t::const_iterator itr_packets,
-                      absl::optional<packet_iterator> op_itr_packet);
+                      std::optional<packet_iterator> op_itr_packet);
 
    private:
     friend BitstreamWriter;
@@ -127,7 +127,7 @@ class BitstreamWriter {
     header_t::iterator itr_header_;
     const packets_t &packets_;
     typename packets_t::const_iterator itr_packets_;
-    absl::optional<packet_iterator> op_itr_packet_;
+    std::optional<packet_iterator> op_itr_packet_;
   };
 
   explicit BitstreamWriter(const packets_t &packets) : packets_(packets) {}
@@ -316,7 +316,7 @@ BitstreamWriter<Arch>::packet_iterator::operator->() const {
 template <Architecture Arch>
 typename BitstreamWriter<Arch>::iterator BitstreamWriter<Arch>::begin() {
   typename packets_t::const_iterator itr_packets = packets_.begin();
-  absl::optional<packet_iterator> op_packet_itr;
+  std::optional<packet_iterator> op_packet_itr;
 
   // May have no packets
   if (itr_packets != packets_.end()) {
@@ -333,7 +333,7 @@ typename BitstreamWriter<Arch>::iterator BitstreamWriter<Arch>::begin() {
 template <Architecture Arch>
 typename BitstreamWriter<Arch>::iterator BitstreamWriter<Arch>::end() {
   return iterator(header_.end(), packets_, packets_.end(),
-                  absl::optional<packet_iterator>());
+                  std::optional<packet_iterator>());
 }
 
 template <Architecture Arch>
@@ -341,7 +341,7 @@ BitstreamWriter<Arch>::iterator::iterator(
   header_t::iterator itr_header,
   const typename BitstreamWriter<Arch>::packets_t &packets,
   typename BitstreamWriter<Arch>::packets_t::const_iterator itr_packets,
-  absl::optional<packet_iterator> itr_packet)
+  std::optional<packet_iterator> itr_packet)
     : itr_header_(itr_header),
       packets_(packets),
       itr_packets_(itr_packets),
