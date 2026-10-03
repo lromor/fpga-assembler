@@ -15,10 +15,21 @@ First, install [Bazel][bazel] and ensure you have a basic C/C++ toolchain set up
 > [!NOTE]
 > If you are using Nix or NixOS, ensure you have [flakes enabled][enable-flakes] and enter the development shell via `nix develop`.
 
-Then run:
+Download the prebuilt [Project X-Ray database](https://github.com/f4pga/prjxray-db)
+with Git. This command puts it in `~/prjxray-db`:
+
+```sh
+git clone --depth 1 https://github.com/f4pga/prjxray-db.git "$HOME/prjxray-db"
+```
+
+Pass the directory for your FPGA family to `--prjxray_db_path`, such as
+`$HOME/prjxray-db/artix7`. The database also has `kintex7`, `spartan7`, and
+`zynq7` directories. Choose a `--part` from that family's `mapping/parts.yaml`.
+
+For the Artix-7 part `xc7a35tcsg324-1`, run:
 
 ```
-bazel run -c opt //fpga:fpga-as -- --prjxray_db_path=/some/path/prjxray-db/artix7 --part=xc7a35tcsg324-1 < /some/path.fasm > output.bit
+bazel run -c opt //fpga:fpga-as -- --prjxray_db_path="$HOME/prjxray-db/artix7" --part=xc7a35tcsg324-1 < /some/path.fasm > output.bit
 ```
 
 Finally, load the bitstream in your FPGA using [openFPGALoader][open-fpga-loader]
