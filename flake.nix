@@ -61,7 +61,7 @@
               mkShell {
                 packages = [
                   git
-                  bazel_8
+                  bazel_9
                   jdk
                   bash
                   gdb
@@ -92,19 +92,19 @@
             # Package fpga-assembler.
             packages.default =
               let
-                # The older buildBazelPackage helper is incompatible with Bazel 8.
+                # The older buildBazelPackage helper is incompatible with Bazel 9.
                 bazelDerivation = pkgs.callPackage (
-                  nixpkgs + "/pkgs/by-name/ba/bazel_8/build-support/bazelDerivation.nix"
+                  nixpkgs + "/pkgs/by-name/ba/bazel_9/build-support/bazelDerivation.nix"
                 ) { };
                 registry = pkgs.fetchFromGitHub {
                   owner = "bazelbuild";
                   repo = "bazel-central-registry";
-                  rev = "6873d34b26b6b294a80c7e4bd2cda1926fdfcc4d";
-                  hash = "sha256-iMjT8jar5x2JYl9OJoGrjljxtK0elwMsOYa1xnNVe6M=";
+                  rev = "ab7d440f336aa430267ed208c983b13306b27486";
+                  hash = "sha256-6EkkVY/rDJ/kQImv9yRenF9XEcFWp1XfPscbvJpX72w=";
                 };
                 common = {
                   src = pkgs.nix-gitignore.gitignoreSourcePure [ ] ./.;
-                  bazel = pkgs.bazel_8;
+                  bazel = pkgs.bazel_9;
                   inherit registry;
                   targets = [ "//..." ];
                   nativeBuildInputs = [ pkgs.git ];
@@ -121,6 +121,7 @@
                     commandArgs = [
                       "--nobuild"
                       "--repository_cache=repo_cache"
+                      "--repo_contents_cache="
                     ];
                     installPhase = ''
                       mkdir -p "$out"
@@ -131,7 +132,7 @@
                     outputHashAlgo = "sha256";
                     outputHash =
                       {
-                        x86_64-linux = "sha256-ysf1IEOVgxkjAokq2/IUb6IEJj0aCVzWsoRoeHnoiyE=";
+                        x86_64-linux = "sha256-T+ojVs+OXKCmmjvBO5WN8gLQ7/AkHCmdRWyG6bmBsc4=";
                       }
                       .${system} or (throw "No hash for system: ${system}");
                   }
@@ -158,11 +159,12 @@
                     runHook preCheck
 
                     # Bazel's bundled test scripts need Nix interpreter paths.
-                    installBase=$(${pkgs.bazel_8}/bin/bazel --batch info install_base)
+                    installBase=$(${pkgs.bazel_9}/bin/bazel --batch info install_base)
                     patchShebangs "$installBase"
-                    ${pkgs.bazel_8}/bin/bazel --batch test //... -c opt \
+                    ${pkgs.bazel_9}/bin/bazel --batch test //... -c opt \
                       --registry=file://${registry} \
                       --repository_cache=repo_cache \
+                      --repo_contents_cache= \
                       --spawn_strategy=standalone \
                       --test_output=errors
 
