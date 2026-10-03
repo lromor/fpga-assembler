@@ -92,9 +92,8 @@
             # Package fpga-assembler.
             packages.default =
               let
-                # The older buildBazelPackage helper is incompatible with Bazel 9.
-                bazelDerivation = pkgs.callPackage (
-                  nixpkgs + "/pkgs/by-name/ba/bazel_9/build-support/bazelDerivation.nix"
+                bazelPackage = pkgs.callPackage (
+                  nixpkgs + "/pkgs/by-name/ba/bazel_9/build-support/bazelPackage.nix"
                 ) { };
                 registry = pkgs.fetchFromGitHub {
                   owner = "bazelbuild";
@@ -102,55 +101,41 @@
                   rev = "ab7d440f336aa430267ed208c983b13306b27486";
                   hash = "sha256-6EkkVY/rDJ/kQImv9yRenF9XEcFWp1XfPscbvJpX72w=";
                 };
-                common = {
-                  src = pkgs.nix-gitignore.gitignoreSourcePure [ ] ./.;
-                  bazel = pkgs.bazel_9;
-                  inherit registry;
-                  targets = [ "//..." ];
-                  nativeBuildInputs = [ pkgs.git ];
-                  env.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-                  bazelPreBuild = ''
+              in
+              (bazelPackage {
+                name = "fpga-as-0.0.1";
+                version = "0.0.1";
+                src = pkgs.nix-gitignore.gitignoreSourcePure [ ] ./.;
+                bazel = pkgs.bazel_9;
+                inherit registry;
+                # Include test dependencies in the offline cache.
+                targets = [ "//..." ];
+                commandArgs = [
+                  "-c"
+                  "opt"
+                  "--spawn_strategy=standalone"
+                ];
+                nativeBuildInputs = [ pkgs.git ];
+                env.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+                bazelRepoCacheFOD = {
+                  outputHash =
+                    {
+                      x86_64-linux = "sha256-T+ojVs+OXKCmmjvBO5WN8gLQ7/AkHCmdRWyG6bmBsc4=";
+                    }
+                    .${system} or (throw "No hash for system: ${system}");
+                  outputHashAlgo = "sha256";
+                };
+                installPhase = ''
+                  runHook preInstall
+                  install -D --strip bazel-bin/fpga/fpga-as "$out/bin/fpga-as"
+                  runHook postInstall
+                '';
+              }).overrideAttrs
+                {
+                  pname = "fpga-as";
+                  preBuild = ''
                     echo "build --jobs=$NIX_BUILD_CORES" >> .bazelrc
                   '';
-                };
-                repoCache = bazelDerivation (
-                  common
-                  // {
-                    name = "fpga-as-repo-cache";
-                    command = "build";
-                    commandArgs = [
-                      "--nobuild"
-                      "--repository_cache=repo_cache"
-                      "--repo_contents_cache="
-                    ];
-                    installPhase = ''
-                      mkdir -p "$out"
-                      cp -r repo_cache "$out/repo_cache"
-                    '';
-                    dontFixup = true;
-                    outputHashMode = "recursive";
-                    outputHashAlgo = "sha256";
-                    outputHash =
-                      {
-                        x86_64-linux = "sha256-T+ojVs+OXKCmmjvBO5WN8gLQ7/AkHCmdRWyG6bmBsc4=";
-                      }
-                      .${system} or (throw "No hash for system: ${system}");
-                  }
-                );
-              in
-              bazelDerivation (
-                common
-                // {
-                  pname = "fpga-as";
-                  version = "0.0.1";
-                  bazelRepoCache = repoCache;
-                  targets = [ "//fpga:fpga-as" ];
-                  command = "build";
-                  commandArgs = [
-                    "-c"
-                    "opt"
-                    "--spawn_strategy=standalone"
-                  ];
                   postPatch = ''
                     patchShebangs scripts/create-workspace-status.sh
                   '';
@@ -170,20 +155,13 @@
 
                     runHook postCheck
                   '';
-                  installPhase = ''
-                    runHook preInstall
-                    install -D --strip bazel-bin/fpga/fpga-as "$out/bin/fpga-as"
-                    runHook postInstall
-                  '';
-
                   meta = {
                     description = "Tool to convert FASM to FPGA bitstream.";
                     homepage = "https://github.com/lromor/fpga-assembler";
                     license = pkgs.lib.licenses.asl20;
                     platforms = pkgs.lib.platforms.linux;
                   };
-                }
-              );
+                };
           };
       };
 }
