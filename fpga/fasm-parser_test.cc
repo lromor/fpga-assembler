@@ -214,6 +214,40 @@ static void LongValueParseTest() {
      {
        {0, 64, 0x4000000000000002UL},
      }},
+
+    // More than 64 digit bits, but not a multiple of 64. The 64-bit words
+    // have to be counted from the least significant digit, which leaves the
+    // short word at the top. Counted from the most significant digit, the
+    // low word held only the last 8 bits here and the high word got the rest.
+    {"WIDE[71:0] = 72'h12_3456_789A_BCDE_F0FF",
+     ParseResult::kSuccess,  //
+     "WIDE",
+     {
+       {0, 64, 0x3456789ABCDEF0FFUL},
+       {64, 8, 0x12UL},
+     }},
+
+    // The same with a binary literal one bit wider than a word.
+    {"WIDE[64:0] = "
+     "65'b1_0000000000000000000000000000000000000000000000000000000000000001",
+     ParseResult::kSuccess,  //
+     "WIDE",
+     {
+       {0, 64, 0x0000000000000001UL},
+       {64, 1, 0x1UL},
+     }},
+
+    // An 83-bit GTP RXCDR_CFG value from a LiteX PCIe design. Only its low 19
+    // bits used to land in place.
+    {"RXCDR_CFG[82:0] = 83'b"
+     "0000000000000000000010001111111111000010000011000000010010001001"
+     "0000001000000010000",
+     ParseResult::kSuccess,  //
+     "RXCDR_CFG",
+     {
+       {0, 64, 0x47FE106024481010UL},
+       {64, 19, 0x0UL},
+     }},
   };
 
   for (const LongValueTestCase &expected : tests) {

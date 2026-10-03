@@ -154,16 +154,29 @@ using bit_range_t = uint16_t;  // gcc slightly faster with 16 bit
     } else                                                                 \
       (v) = (v) * (base) + d
 
-// Parse big number with given power-of-2 base
+// Parse big number with given power-of-2 base.
+// Words are 64 bits counted from the least significant digit, so when the
+// digit count is not a multiple of 64 the short word is the most significant
+// one. Counting from the first digit instead put the short word at the bottom
+// and shifted every bit above it.
 #define fasm_parse_long_number_with_base(v, l2base)                         \
   fasm_skip_blank();                                                        \
   {                                                                         \
+    unsigned digit_bits = 0;                                                \
+    for (const char *p = it;; ++p) {                                        \
+      const int8_t pd = internal::kDigitToInt[(uint8_t)*p];                 \
+      const bool is_in_literal = pd < (1 << (l2base));                      \
+      if (!is_in_literal) break;                                            \
+      const bool is_separator = pd == internal::kDigitSeparator;            \
+      if (!is_separator) digit_bits += (l2base);                            \
+    }                                                                       \
     unsigned n = 0;                                                         \
     for (int8_t d;                                                          \
          (d = internal::kDigitToInt[(uint8_t)*it]) < (1 << (l2base)); ++it) \
       if (d == internal::kDigitSeparator) {                                 \
       } else {                                                              \
-        if ((n % 64) == 0) (v).emplace_back();                              \
+        const bool starts_new_word = n == 0 || (digit_bits - n) % 64 == 0;  \
+        if (starts_new_word) (v).emplace_back();                            \
         (v).back() = (v).back() * (1 << (l2base)) + d;                      \
         n += (l2base);                                                      \
       }                                                                     \
