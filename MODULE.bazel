@@ -4,9 +4,9 @@ module(
 )
 
 # Bazel C/C++ language rules and deps.
-bazel_dep(name = "rules_cc", version = "0.2.17")
-bazel_dep(name = "abseil-cpp", version = "20260107.1")
-bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
+bazel_dep(name = "rules_cc", version = "0.2.25")
+bazel_dep(name = "abseil-cpp", version = "20260817.0")
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1")
 bazel_dep(name = "rapidjson", version = "1.1.0.bcr.20250205")
 bazel_dep(name = "rules_license", version = "1.0.0")
 

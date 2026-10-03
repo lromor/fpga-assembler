@@ -98,8 +98,8 @@
                 registry = pkgs.fetchFromGitHub {
                   owner = "bazelbuild";
                   repo = "bazel-central-registry";
-                  rev = "ab7d440f336aa430267ed208c983b13306b27486";
-                  hash = "sha256-6EkkVY/rDJ/kQImv9yRenF9XEcFWp1XfPscbvJpX72w=";
+                  rev = "bb868b23efd5ab372a74d9c87568a4526063ea12";
+                  hash = "sha256-Fx9sL4BBtppGrBuE8rPNsF3AofYNDS6Rt0KI8LQm6Jk=";
                 };
               in
               (bazelPackage {
@@ -113,14 +113,13 @@
                 commandArgs = [
                   "-c"
                   "opt"
-                  "--spawn_strategy=standalone"
                 ];
                 nativeBuildInputs = [ pkgs.git ];
                 env.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
                 bazelRepoCacheFOD = {
                   outputHash =
                     {
-                      x86_64-linux = "sha256-T+ojVs+OXKCmmjvBO5WN8gLQ7/AkHCmdRWyG6bmBsc4=";
+                      x86_64-linux = "sha256-Y/vFU6IdwJ9QHQwma4Lxci69gwGPE0sONp6MU8oyCYI=";
                     }
                     .${system} or (throw "No hash for system: ${system}");
                   outputHashAlgo = "sha256";
@@ -150,7 +149,6 @@
                       --registry=file://${registry} \
                       --repository_cache=repo_cache \
                       --repo_contents_cache= \
-                      --spawn_strategy=standalone \
                       --test_output=errors
 
                     runHook postCheck
