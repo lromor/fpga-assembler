@@ -103,7 +103,7 @@
                 };
               in
               (bazelPackage {
-                name = "fpga-as-0.0.1";
+                name = "fpga-as";
                 version = "0.0.1";
                 src = pkgs.nix-gitignore.gitignoreSourcePure [ ] ./.;
                 bazel = pkgs.bazel_9;
