@@ -149,10 +149,13 @@ class BitstreamWriter {
   // Creates a Xilinx bit header which is mostly a
   // Tag-Length-Value(TLV) format documented here:
   // http://www.fpga-faq.com/FAQ_Pages/0026_Tell_me_about_bit_files.htm
+  //
+  // The last field ('e') holds the length in bytes of the configuration data
+  // that follows the header.
   BitstreamHeader create_header(const std::string &part_name,
                                 const std::string &source_name,
                                 const std::string &generator_name,
-                                std::ostream &out);
+                                uint32_t data_length);
 };
 
 template <Architecture Arch>
@@ -161,30 +164,33 @@ int BitstreamWriter<Arch>::writeBitstream(const ConfigurationPackage &packets,
                                           const std::string &source_name,
                                           const std::string &generator_name,
                                           std::ostream &out) {
+  // The header holds the length of the configuration data. Compute it before
+  // writing anything, because the output stream is not always seekable: it is
+  // not when it is a pipe, and std::cout on macOS is not even when it is
+  // redirected to a file. Patching the length in afterwards does not work then.
+  BitstreamWriter<Arch> out_bitstream_writer(packets);
+  constexpr int bytes_per_word = sizeof(typename FrameWords::value_type);
+  const auto num_words = static_cast<uint64_t>(
+    std::distance(out_bitstream_writer.begin(), out_bitstream_writer.end()));
+  const uint64_t length_of_data = num_words * bytes_per_word;
+  if (length_of_data > UINT32_MAX) {
+    std::cerr << "Configuration data is too long for the bitstream header\n";
+    return 1;
+  }
+
   BitstreamHeader bit_header(
-    create_header(part_name, source_name, generator_name, out));
+    create_header(part_name, source_name, generator_name,
+                  static_cast<uint32_t>(length_of_data)));
   out.write(reinterpret_cast<const char *>(bit_header.data()),
             bit_header.size());
 
-  auto end_of_header_pos = out.tellp();
-  auto header_data_length_pos =
-    end_of_header_pos - static_cast<std::ofstream::off_type>(4);
-
-  BitstreamWriter<Arch> out_bitstream_writer(packets);
-  int bytes_per_word = sizeof(typename FrameWords::value_type);
   for (uint32_t word : out_bitstream_writer) {
     for (int byte = bytes_per_word - 1; byte >= 0; byte--) {
       out.put((word >> (byte * 8)) & 0xFF);
     }
   }
 
-  uint32_t const length_of_data = out.tellp() - end_of_header_pos;
-
-  out.seekp(header_data_length_pos);
-  for (int byte = 3; byte >= 0; byte--) {
-    out.put((length_of_data >> (byte * 8)) & 0xFF);
-  }
-  return 0;
+  return out ? 0 : 1;
 }
 
 template <Architecture Arch>
@@ -192,7 +198,7 @@ typename BitstreamWriter<Arch>::BitstreamHeader
 BitstreamWriter<Arch>::create_header(const std::string &part_name,
                                      const std::string &source_name,
                                      const std::string &generator_name,
-                                     std::ostream &out) {
+                                     uint32_t data_length) {
   // Sync header
   BitstreamHeader bit_header{0x0,  0x9,  0x0f, 0xf0, 0x0f, 0xf0, 0x0f,
                              0xf0, 0x0f, 0xf0, 0x00, 0x00, 0x01, 'a'};
@@ -231,7 +237,10 @@ BitstreamWriter<Arch>::create_header(const std::string &part_name,
   bit_header.insert(bit_header.end(), build_time_string.begin(),
                     build_time_string.end());
   bit_header.push_back(0x0);
-  bit_header.insert(bit_header.end(), {'e', 0x0, 0x0, 0x0, 0x0});
+  bit_header.push_back('e');
+  for (int byte = 3; byte >= 0; byte--) {
+    bit_header.push_back(static_cast<uint8_t>(data_length >> (byte * 8)));
+  }
   return bit_header;
 }
 
