@@ -16,7 +16,6 @@
 #define FPGA_XILINX_BITSTREAM_WRITER_H
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <memory>
