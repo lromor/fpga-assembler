@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <ios>
 #include <memory>
 #include <ostream>
 #include <sstream>
