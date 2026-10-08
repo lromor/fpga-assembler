@@ -9,8 +9,14 @@
  */
 #include "fpga/xilinx/bitstream-writer.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <ios>
 #include <memory>
+#include <ostream>
+#include <sstream>
+#include <streambuf>
+#include <string>
 #include <vector>
 
 #include "absl/types/span.h"
@@ -117,6 +123,57 @@ void AddType2(std::vector<std::unique_ptr<ConfigurationPacket>> &packets) {
   }
 }
 
+// A stream buffer which collects the output but cannot seek, like a pipe.
+// The default seekoff() and seekpos() fail, so tellp() returns -1 and seekp()
+// sets the failbit. This is also what std::cout does on macOS.
+class NonSeekableBuffer : public std::streambuf {
+ public:
+  const std::string &data() const { return data_; }
+
+ protected:
+  int_type overflow(int_type ch) override {
+    if (!traits_type::eq_int_type(ch, traits_type::eof())) {
+      data_.push_back(traits_type::to_char_type(ch));
+    }
+    return traits_type::not_eof(ch);
+  }
+
+  std::streamsize xsputn(const char *s, std::streamsize n) override {
+    data_.append(s, static_cast<size_t>(n));
+    return n;
+  }
+
+ private:
+  std::string data_;
+};
+
+uint32_t ReadBigEndian(const std::string &data, size_t pos, size_t num_bytes) {
+  uint32_t value = 0;
+  for (size_t i = 0; i < num_bytes; i++) {
+    value = (value << 8) | static_cast<uint8_t>(data.at(pos + i));
+  }
+  return value;
+}
+
+// Returns the position after the header of a .bit file and sets
+// "declared_length" to the data length which the header declares.
+// The header is a sequence of fields: first one with a 2-byte length, then the
+// tagged fields 'a' to 'd' with a 2-byte length each, then 'e' with a 4-byte
+// data length. See
+// http://www.fpga-faq.com/FAQ_Pages/0026_Tell_me_about_bit_files.htm
+size_t ParseBitHeader(const std::string &data, uint32_t &declared_length) {
+  size_t pos = 0;
+  pos += 2 + ReadBigEndian(data, pos, 2);  // Sync header.
+  pos += 2;                                // Always 0x0001.
+  for (const char tag : {'a', 'b', 'c', 'd'}) {
+    EXPECT_EQ(data.at(pos), tag);
+    pos += 1 + 2 + ReadBigEndian(data, pos + 1, 2);
+  }
+  EXPECT_EQ(data.at(pos), 'e');
+  declared_length = ReadBigEndian(data, pos + 1, 4);
+  return pos + 1 + 4;
+}
+
 // Empty packets should produce just the header
 TEST(BitstreamWriterTest, WriteHeader) {
   std::vector<std::unique_ptr<ConfigurationPacket>> const packets;
@@ -202,6 +259,52 @@ TEST(BitstreamWriterTest, WriteMulti) {
     // Type 1
     0x030006000};
   EXPECT_EQ(words, ref);
+}
+// The header must declare the length of the data which follows it, also when
+// the output stream cannot seek back to patch the length in afterwards.
+TEST(BitstreamWriterTest, HeaderLengthOnNonSeekableStream) {
+  std::vector<std::unique_ptr<ConfigurationPacket>> packets;
+  AddType1(packets);
+  AddType1E(packets);
+  AddType2(packets);
+  BitstreamWriter<kArch> writer(packets);
+  const std::vector<uint32_t> words(writer.begin(), writer.end());
+
+  NonSeekableBuffer buffer;
+  std::ostream out(&buffer);
+  ASSERT_EQ(out.tellp(), std::ostream::pos_type(-1));
+  EXPECT_EQ(
+    writer.writeBitstream(packets, "xc7a35tcsg324-1", "test", "test", out), 0);
+  EXPECT_TRUE(out.good());
+
+  const std::string &data = buffer.data();
+  uint32_t declared_length = 0;
+  const size_t data_pos = ParseBitHeader(data, declared_length);
+  EXPECT_EQ(declared_length, words.size() * sizeof(uint32_t));
+  EXPECT_EQ(declared_length, data.size() - data_pos);
+  // The configuration data is the big-endian words from the iterator.
+  ASSERT_EQ(data.size() - data_pos, words.size() * sizeof(uint32_t));
+  for (size_t i = 0; i < words.size(); i++) {
+    EXPECT_EQ(ReadBigEndian(data, data_pos + 4 * i, 4), words[i]) << i;
+  }
+}
+
+// The same output must come out of a stream which can seek.
+TEST(BitstreamWriterTest, HeaderLengthOnSeekableStream) {
+  std::vector<std::unique_ptr<ConfigurationPacket>> packets;
+  AddType1(packets);
+  AddType2(packets);
+  BitstreamWriter<kArch> writer(packets);
+
+  std::ostringstream out;
+  EXPECT_EQ(
+    writer.writeBitstream(packets, "xc7a35tcsg324-1", "test", "test", out), 0);
+
+  const std::string data = out.str();
+  uint32_t declared_length = 0;
+  const size_t data_pos = ParseBitHeader(data, declared_length);
+  EXPECT_GT(declared_length, 0u);
+  EXPECT_EQ(declared_length, data.size() - data_pos);
 }
 }  // namespace
 }  // namespace xilinx
