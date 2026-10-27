@@ -98,8 +98,11 @@ class PartDatabase {
   using BitSetter = std::function<void(ConfigBusType bus, uint32_t address,
                                        const FrameBit &bit, bool value)>;
 
-  // Set bits to configure a feature in a specific tile.
-  // Returns an error when the database has no bits for that feature.
+  // Look up a tile feature's configuration bits in the tile-type databases,
+  // following aliases when needed. Call bit_setter with each bit's bus,
+  // frame address, position, and value. Pseudo-PIPs return success without
+  // calling bit_setter. Lookup failures are reported through the returned
+  // status.
   absl::Status ConfigBits(const std::string &tile_name,
                           const std::string &feature, uint32_t address,
                           const BitSetter &bit_setter);

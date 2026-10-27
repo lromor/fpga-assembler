@@ -455,6 +455,16 @@ absl::Status PartDatabase::ConfigBits(const std::string &tile_name,
                                       const std::string &feature,
                                       uint32_t address,
                                       const BitSetter &bit_setter) {
+  // Check the original type's pseudo-PIPs before resolving any bit alias.
+  const auto tile_it = tiles_->grid.find(tile_name);
+  if (tile_it != tiles_->grid.end()) {
+    const std::string &tile_type = tile_it->second.type;
+    AddSegbitsToCache(tile_type);
+    if (IsPseudoPIP(tile_type, absl::StrJoin({tile_type, feature}, "."))) {
+      return absl::OkStatus();
+    }
+  }
+
   const std::optional<FeatureLookup> lookup = LookupFeature(tile_name, feature);
   if (!lookup.has_value()) {
     return absl::InvalidArgumentError(
@@ -462,18 +472,6 @@ absl::Status PartDatabase::ConfigBits(const std::string &tile_name,
   }
   const SegmentsBitsWithPseudoPIPs &tile_type_features_bits =
     segment_bits_cache_.at(lookup->tile_type);
-  const std::string tile_segments_bits_key =
-    absl::StrJoin({tile_name, lookup->aliased_feature}, ".");
-  // If it's a pseudo pip, skip: it documents wiring or a tie and configures
-  // no bits.  The pips database of the tile's own type is consulted as well,
-  // because the segbits may come from an alias while the pseudo pips do not.
-  const std::string pips_feature_key =
-    absl::StrJoin({lookup->pips_tile_type, lookup->aliased_feature}, ".");
-  if (IsPseudoPIP(lookup->pips_tile_type, tile_segments_bits_key) ||
-      IsPseudoPIP(lookup->pips_tile_type, pips_feature_key) ||
-      tile_type_features_bits.pips.contains(tile_segments_bits_key)) {
-    return absl::OkStatus();
-  }
 
   // Search our database of features and get the segbit.
   const struct TileFeature tile_feature = {
@@ -482,8 +480,7 @@ absl::Status PartDatabase::ConfigBits(const std::string &tile_name,
     .address = address,
   };
 
-  // TODO(lromor): Is this really necessary? It looks like all pips are
-  // different.
+  // The alias target can also define the translated feature as a pseudo-PIP.
   if (tile_type_features_bits.pips.contains(tile_feature.tile_feature)) {
     return absl::OkStatus();
   }

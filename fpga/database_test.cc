@@ -1,11 +1,15 @@
 #include "fpga/database.h"
 
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "fpga/database-parsers.h"
 #include "gmock/gmock.h"
@@ -88,6 +92,101 @@ TEST(BanksTilesRegistry, CorrectMappingAndTileNames) {
       }
     }
   }
+}
+// Tiles whose bits alias another tile type (e.g. LIOI3_SING -> LIOI3, see
+// prjxray's tilegrid "alias" entries) keep a pseudo-PIP database of their own
+// type: LIOI3_SING.IOI_LOGIC_OUTS18_0.IOI_ILOGIC0_O is an "always" pseudo PIP
+// in ppips_lioi3_sing.db and does not exist in the LIOI3 databases. Such
+// features must resolve before the alias is applied, and real features must
+// still map through the aliased type's segbits with the alias offset.
+TEST(PartDatabase, AliasedTileResolvesOwnPseudoPIPs) {
+  TileGrid grid;
+  grid.insert(
+    {"LIOI3_SING_X0Y50",
+     Tile{.type = "LIOI3_SING",
+          .coord = {0, 50},
+          .clock_region = {},
+          .bits = {{ConfigBusType::kCLBIOCLK,
+                    BitsBlock{.alias = BitsBlockAlias{.sites = {},
+                                                      .start_offset = 2,
+                                                      .type = "LIOI3"},
+                              .base_address = 0x400,
+                              .frames = 42,
+                              .offset = 0,
+                              .words = 2}}},
+          .pin_functions = {},
+          .sites = {},
+          .prohibited_sites = {}}});
+  int alias_loads = 0;
+  const TileTypesSegmentsBitsGetter getter =
+    [&alias_loads](const std::string &tile_type)
+    -> std::optional<SegmentsBitsWithPseudoPIPs> {
+    if (tile_type == "LIOI3_SING") {
+      return SegmentsBitsWithPseudoPIPs{
+        .pips = {{"LIOI3_SING.IOI_LOGIC_OUTS18_0.IOI_ILOGIC0_O",
+                  PseudoPIPType::kAlways}},
+        .segment_bits = {}};
+    }
+    if (tile_type == "LIOI3") {
+      ++alias_loads;
+      SegmentsBits segbits;
+      segbits.insert(
+        {TileFeature{.tile_feature = "LIOI3.IOB_Y0.PULLTYPE.PULLUP",
+                     .address = 0},
+         {SegmentBit{.word_column = 3, .word_bit = 70, .is_set = true}}});
+      return SegmentsBitsWithPseudoPIPs{
+        .pips = {{"LIOI3.WIRE_A.WIRE_B", PseudoPIPType::kAlways}},
+        .segment_bits = {{ConfigBusType::kCLBIOCLK, segbits}}};
+    }
+    return std::nullopt;
+  };
+  const absl::StatusOr<BanksTilesRegistry> banks =
+    BanksTilesRegistry::Create(Part{}, PackagePins{}, grid);
+  ASSERT_TRUE(banks.ok()) << banks.status().message();
+  PartDatabase db(
+    std::make_shared<PartDatabase::Tiles>(grid, getter, banks.value(), Part{}));
+
+  // An own-type pseudo-PIP sets no bits and does not load the alias target.
+  int calls = 0;
+  EXPECT_TRUE(
+    db.ConfigBits("LIOI3_SING_X0Y50", "IOI_LOGIC_OUTS18_0.IOI_ILOGIC0_O", 0,
+                  [&](ConfigBusType, uint32_t, const PartDatabase::FrameBit &,
+                      bool) { ++calls; })
+      .ok());
+  EXPECT_EQ(calls, 0);
+  EXPECT_EQ(alias_loads, 0);
+
+  // A pseudo-PIP found only in the alias target also sets no bits.
+  EXPECT_TRUE(
+    db.ConfigBits("LIOI3_SING_X0Y50", "WIRE_A.WIRE_B", 0,
+                  [&](ConfigBusType, uint32_t, const PartDatabase::FrameBit &,
+                      bool) { ++calls; })
+      .ok());
+  EXPECT_EQ(calls, 0);
+  EXPECT_EQ(alias_loads, 1);
+
+  // A real feature resolves through the aliased type's segbits, shifted by
+  // the alias start offset: word bit 70 - 2 * 32 = bit 6 of word 0.
+  std::vector<std::tuple<ConfigBusType, uint32_t, uint32_t, uint32_t, bool>>
+    bits;
+  EXPECT_TRUE(db.ConfigBits("LIOI3_SING_X0Y50", "IOB_Y0.PULLTYPE.PULLUP", 0,
+                            [&](ConfigBusType bus, uint32_t address,
+                                const PartDatabase::FrameBit &bit, bool value) {
+                              bits.emplace_back(bus, address, bit.word,
+                                                bit.index, value);
+                            })
+                .ok());
+  ASSERT_EQ(bits.size(), 1U);
+  EXPECT_EQ(bits[0],
+            std::make_tuple(ConfigBusType::kCLBIOCLK, 0x403U, 0U, 6U, true));
+
+  // Preserve main's error-status API and useful unknown-feature diagnostic.
+  const absl::Status status = db.ConfigBits(
+    "LIOI3_SING_X0Y50", "NOT.A.FEATURE", 0,
+    [](ConfigBusType, uint32_t, const PartDatabase::FrameBit &, bool) {});
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status.message(), ::testing::HasSubstr("LIOI3_SING_X0Y50"));
+  EXPECT_THAT(status.message(), ::testing::HasSubstr("NOT.A.FEATURE"));
 }
 }  // namespace
 }  // namespace fpga
