@@ -1,0 +1,8 @@
+fpga-assembler is licensed under Apache-2.0; see LICENSE.
+
+The following hardware-test code is licensed under GPL-2.0-only:
+  tests/hardware/gpio.h
+
+gpio.h is adapted from Henner Zeller's rpi-rgb-led-matrix GPIO implementation.
+His copyright notice and the source reference are retained in that file.
+The GPL license text is in LICENSES/GPL-2.0-only.txt.
