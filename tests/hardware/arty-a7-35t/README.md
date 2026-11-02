@@ -90,13 +90,17 @@ Use `./hardware_test --list` to preview the traces without accessing GPIOs.
 ## GitHub Actions
 
 PRs run the usual checks and build the hardware fixtures and Pi executable.
-They do not access the board. To test a PR before merging, open **Actions →
-Hardware → Run workflow**, select the PR's branch, and start the run. This
-manual action runs low, high, low, and loopback on the Pi. Hardware tests
-are optional; keep `Hardware / Test` out of required merge checks.
+The hardware job then waits for approval. From the PR's checks, open the
+Hardware run, choose **Review deployments**, select `fpgas-online`, and click
+**Approve and deploy**. Despite GitHub's wording, this runs the low, high,
+low, and loopback tests on the Pi. Hardware tests are optional; keep
+`Hardware / Test` out of required merge checks.
 
-The workflow must first be present on `main` for the Run workflow button to
-appear. Configure these repository settings:
+In **Settings → Environments → fpgas-online**, require review by `lromor`
+and allow self-review so the owner can approve their own PR runs. This
+repository setting enforces the approval; naming the environment in YAML
+alone does not. Pushes to `main` only build; manual workflow runs also need
+approval. Configure these repository settings:
 
 | Setting | Type | Value |
 | --- | --- | --- |
