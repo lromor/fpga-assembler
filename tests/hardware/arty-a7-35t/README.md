@@ -103,6 +103,56 @@ Normal completion checks that driven pins return to inputs; error cleanup
 also attempts this before releasing the request. Cleanup errors are reported.
 Failure returns a nonzero exit status.
 
+The **Hardware / Test** GitHub job assembles these fixtures, cross-compiles a
+static ARM executable with Bazel, and uploads both to FPGAs Online over SSH.
+It programs and checks low, high, low, then loopback. The Pi needs
+`openFPGALoader`, `flock`, and GPIO v2 access; it does not need Bazel. The CI
+binary targets ARMv7 Linux on a Pi 2-4, including PiCi's 32-bit OS.
+
+Cross-compile from the existing Nix development shell with:
+
+```sh
+bazel build -c opt \
+  --platforms=//tests/hardware/arty-a7-35t:raspberry_pi \
+  //tests/hardware/arty-a7-35t:hardware_test
+```
+
+The registered [hermetic LLVM toolchain](https://github.com/hermeticbuild/hermetic-llvm)
+supplies the compiler, Linux headers, and static musl runtime. No system cross
+compiler or target sysroot is needed. The same command runs in Ubuntu CI;
+ordinary native builds keep their existing toolchain.
+
+Choose an available A7-35T with the wiring above and configure these repository
+secrets: `FPGAS_ONLINE_SSH_PASSWORD`, `FPGAS_ONLINE_KNOWN_HOSTS`, and
+`FPGAS_ONLINE_SSH_CONFIG`. Set repository variable `FPGAS_ONLINE_GPIO_CHIP`
+to the verified header controller's path, for example `/dev/gpiochip0`.
+The workflow requires this setting; it does not guess the chip. Use the board's
+password and obtain its host key through the provider. Password login needs no
+changes to the Pi's boot image. Each run uploads its artifacts again, so a Pi
+reboot does not require reinstalling our test files or an SSH public key.
+Use this SSH configuration with the host and forwarded port from the board's page:
+
+```sshconfig
+Host arty
+  HostName ps1.fpgas.online
+  Port 10222
+  User pi
+  PreferredAuthentications password
+  PubkeyAuthentication no
+  NumberOfPasswordPrompts 1
+  StrictHostKeyChecking yes
+  ConnectTimeout 15
+```
+
+The job runs on pull requests, main pushes, and manual dispatch. Missing
+configuration, unreachable hardware, programming errors, GPIO access errors, and mismatches
+fail the job. Fork pull requests have no access to these secrets; run a
+reviewed branch in this repository to exercise hardware. GitHub serializes
+this repository's runs, and `flock` serializes users of the same Pi lock.
+Carl has agreed that we can assume no other users for now. There is no
+service-wide queue: these locks coordinate our runs, but do not exclude other
+visitors. Revisit board allocation with the operator if contention appears.
+
 The GPIO abstraction is adapted from Henner Zeller's
 [rpi-rgb-led-matrix GPIO code](https://github.com/hzeller/rpi-rgb-led-matrix/blob/3da7a3bdfca4637bb79ff038bc2bb26965197db5/lib/gpio.cc).
 Its abstraction now uses Linux GPIO v2 requests for direction, reads, and

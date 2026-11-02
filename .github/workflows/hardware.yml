@@ -1,0 +1,79 @@
+name: Hardware
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  USE_BAZEL_VERSION: 9.1.1
+concurrency:
+  group: fpgas-online-arty
+  cancel-in-progress: false
+jobs:
+  Test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GPIO_CHIP: ${{ vars.FPGAS_ONLINE_GPIO_CHIP }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: openXC7/prjxray-db
+          ref: a8b09269beb6e3d3c07e2a0901f845420df1c802
+          path: hardware-db
+      - name: Assemble fixtures
+        run: |
+          bazel build -c opt //fpga:fpga-as
+          mkdir hardware
+          for fasm in tests/hardware/arty-a7-35t/*.fasm; do
+            fixture=$(basename "$fasm" .fasm)
+            bazel-bin/fpga/fpga-as --prjxray_db_path=hardware-db/artix7 \
+              --part=xc7a35tcsg324-1 < "$fasm" > "hardware/$fixture.bit"
+          done
+      - name: Build the Pi executable with Bazel
+        run: |
+          bazel build -c opt \
+            --platforms=//tests/hardware/arty-a7-35t:raspberry_pi \
+            //tests/hardware/arty-a7-35t:hardware_test
+          cp bazel-bin/tests/hardware/arty-a7-35t/hardware_test LICENSES/GPL-2.0-only.txt hardware/
+      - name: Configure SSH
+        env:
+          SSH_CONFIG: ${{ secrets.FPGAS_ONLINE_SSH_CONFIG }}
+          SSH_PASSWORD: ${{ secrets.FPGAS_ONLINE_SSH_PASSWORD }}
+          SSH_KNOWN_HOSTS: ${{ secrets.FPGAS_ONLINE_KNOWN_HOSTS }}
+        run: |
+          if [[ -z "$SSH_CONFIG" || -z "$SSH_PASSWORD" || -z "$SSH_KNOWN_HOSTS" ]]; then
+            echo '::error::Set FPGAS_ONLINE_SSH_CONFIG, FPGAS_ONLINE_SSH_PASSWORD and FPGAS_ONLINE_KNOWN_HOSTS; see the Arty README.'
+            exit 1
+          fi
+          if [[ ! "$GPIO_CHIP" =~ ^/dev/gpiochip[0-9]+$ ]]; then
+            echo '::error::Set FPGAS_ONLINE_GPIO_CHIP to the Pi header controller, such as /dev/gpiochip0.'
+            exit 1
+          fi
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_CONFIG" > ~/.ssh/config
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Program and check the Arty on FPGAs Online
+        env:
+          SSH_PASSWORD: ${{ secrets.FPGAS_ONLINE_SSH_PASSWORD }}
+        run: |
+          printf '#!/bin/sh\nexec printenv SSH_PASSWORD\n' > "$RUNNER_TEMP/ssh-askpass"
+          chmod 700 "$RUNNER_TEMP/ssh-askpass"
+          export SSH_ASKPASS="$RUNNER_TEMP/ssh-askpass" SSH_ASKPASS_REQUIRE=force
+          remote_dir="Uploads/fpga-as-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap 'ssh arty rm -rf -- "$remote_dir"' EXIT
+          ssh arty mkdir -p -- "$remote_dir"
+          scp hardware/* arty:"$remote_dir/"
+          ssh arty flock -w 60 /tmp/fpga-as-ci.lock bash -se -- "$remote_dir" "$GPIO_CHIP" <<'REMOTE'
+          cd "$1"
+          for mode in low high low loopback; do
+            fixture="gpio-$mode"
+            if [[ "$mode" == loopback ]]; then fixture=loopback; fi
+            openFPGALoader -b arty --freq 1000000 -m "$fixture.bit"
+            ./hardware_test "$mode" "$2"
+          done
+          REMOTE

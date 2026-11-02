@@ -9,3 +9,10 @@ cc_binary(
     target_compatible_with = ["@platforms//os:linux"],
     deps = ["//tests/hardware:gpio"],
 )
+
+# Pi 2-4, with Linux GPIO v2 headers and a static musl runtime.
+platform(
+    name = "raspberry_pi",
+    constraint_values = ["@llvm//constraints/kernel/linux:5.10"],
+    parents = ["@llvm//platforms:linux_armv7_musl"],
+)

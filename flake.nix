@@ -119,7 +119,7 @@
                 bazelRepoCacheFOD = {
                   outputHash =
                     {
-                      x86_64-linux = "sha256-Y/vFU6IdwJ9QHQwma4Lxci69gwGPE0sONp6MU8oyCYI=";
+                      x86_64-linux = "sha256-TtMYkzvISDmIDetJvZQlCMIIlMnmtBeMPXex/UliGuw=";
                     }
                     .${system} or (throw "No hash for system: ${system}");
                   outputHashAlgo = "sha256";
