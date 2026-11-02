@@ -41,6 +41,11 @@ Finally, load the bitstream in your FPGA using [openFPGALoader][open-fpga-loader
 openFPGALoader -b arty output.bit
 ```
 
+## Hardware tests
+
+See the [Arty A7-35T hardware tests](tests/hardware/arty-a7-35t/README.md)
+for the FASM fixtures, Raspberry Pi harness, and instructions.
+
 ## Installation
 
 For installing the binary in your home directory (e.g., ~/bin), run the following command:

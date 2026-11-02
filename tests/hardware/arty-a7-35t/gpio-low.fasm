@@ -1,0 +1,23 @@
+# Drive JA1 (G13), observed by the Pi on BCM8, low.
+# Pin mappings and sources: README.md#wiring-and-channel-names.
+# Start with the same output configuration as gpio-high, then route GND to D1.
+
+# Enable the 3.3 V output driver (the DB groups the 8/12 mA encodings).
+LIOB33_SING_X0Y99.IOB_Y1.LVCMOS33_LVTTL.DRIVE.I12_I8
+
+# Pass D1 directly to the output, bypassing registers and serialization.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OMUX.D1
+
+# Enable the OQ output-data path so the pad receives D1.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OQUSED
+
+# Use unregistered tri-state control; no output-enable clock is needed.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OSERDES.DATA_RATE_TQ.BUF
+
+# Route the constant-zero wire to GFAN0, the intermediate wire for this low
+# output.
+INT_L_X0Y99.GFAN0.GND_WIRE
+
+# Select GFAN0 for IMUX_L34, replacing its default VCC source and driving D1
+# low.
+INT_L_X0Y99.IMUX_L34.GFAN0

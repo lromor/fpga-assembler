@@ -1,0 +1,65 @@
+# Combinational JA2 (B11, Pi BCM10) -> JA1 (G13, Pi BCM8).
+# Pin mappings and sources: README.md#wiring-and-channel-names.
+# Routed reference design; fixed/default pseudo-PIPs document the whole route.
+# Routing entries are TILE.DESTINATION.SOURCE (source -> destination).
+
+# Set JA1's 3.3 V output-drive encoding (I12_I16 in the reference).
+LIOB33_SING_X0Y99.IOB_Y1.LVCMOS33_LVTTL.DRIVE.I12_I16
+
+# Use slow output slew on JA1 to avoid unnecessarily sharp GPIO edges.
+LIOB33_SING_X0Y99.IOB_Y1.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVTTL_SSTL135_SSTL15.SLEW.SLOW
+
+# Disable JA1's weak pull; the output driver supplies the tested level.
+LIOB33_SING_X0Y99.IOB_Y1.PULLTYPE.NONE
+
+# Use unregistered tri-state control; this circuit needs no clock.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OSERDES.DATA_RATE_TQ.BUF
+
+# Pass D1 directly to the output, bypassing registers and serialization.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OMUX.D1
+
+# Enable the OQ data path that drives JA1.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OQUSED
+
+# Keep JA2's input polarity: high on JA2 must produce high on JA1.
+LIOI3_X0Y91.ILOGIC_Y0.ZINV_D
+
+# Disable JA2's weak pull so the Pi supplies its input level.
+LIOB33_X0Y91.IOB_Y0.PULLTYPE.NONE
+
+# Make JA2 input-only so the FPGA does not drive against the Pi.
+LIOB33_X0Y91.IOB_Y0.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVDS_25_LVTTL_SSTL135_SSTL15_TMDS_33.IN_ONLY
+
+# Keep the reference slew encoding; an input-only pad drives no edges.
+LIOB33_X0Y91.IOB_Y0.LVCMOS12_LVCMOS15_LVCMOS18_LVCMOS25_LVCMOS33_LVTTL.SLEW.FAST
+
+# Enable the input receiver for the Pi's 3.3 V logic levels.
+LIOB33_X0Y91.IOB_Y0.LVCMOS25_LVCMOS33_LVTTL.IN
+
+# Fixed connection: ILOGIC output -> LOGIC_OUTS18_1; no bits to set.
+LIOI3_X0Y91.IOI_LOGIC_OUTS18_1.IOI_ILOGIC0_O
+
+# Fixed connection: pass the signal through the I/O interface to channel 18.
+IO_INT_INTERFACE_L_X0Y92.INT_INTERFACE_LOGIC_OUTS_L18.INT_INTERFACE_LOGIC_OUTS_L_B18
+
+# Route channel 18 onto NN6BEG0, carrying JA2's level north toward JA1.
+INT_L_X0Y92.NN6BEG0.LOGIC_OUTS_L18
+
+# At Y98, route NN6END0 onto NR1BEG0 to reach the next row.
+INT_L_X0Y98.NR1BEG0.NN6END0
+
+# At Y99, route NR1END0 onto WR1BEG1 to reach the output mux.
+INT_L_X0Y99.WR1BEG1.NR1END0
+
+# Select the continuation ER1END1 for IMUX_L34, feeding JA1's data input.
+INT_L_X0Y99.IMUX_L34.ER1END1
+
+# Fixed connection: IMUX34 -> OLOGIC D1, completing the data route.
+LIOI3_SING_X0Y99.IOI_OLOGIC1_D1.IOI_IMUX34_0
+
+# Default pseudo-PIP: VCC -> IMUX_L15; no bits to set.
+# With ZINV_T1 unset, the inverted T1 signal keeps the output enabled.
+INT_L_X0Y99.IMUX_L15.VCC_WIRE
+
+# Fixed connection: IMUX15 -> OLOGIC T1, completing output-enable routing.
+LIOI3_SING_X0Y99.IOI_OLOGIC1_T1.IOI_IMUX15_0

@@ -1,0 +1,16 @@
+# Drive JA1 (G13), observed by the Pi on BCM8, high.
+# Pin mappings and sources: README.md#wiring-and-channel-names.
+# The unselected IMUX_L34 defaults to VCC, feeding the direct D1 output path.
+# The default T1 polarity keeps the output enabled.
+
+# Enable the 3.3 V output driver (the DB groups the 8/12 mA encodings).
+LIOB33_SING_X0Y99.IOB_Y1.LVCMOS33_LVTTL.DRIVE.I12_I8
+
+# Pass D1 directly to the output, bypassing registers and serialization.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OMUX.D1
+
+# Enable the OQ output-data path so the pad receives D1.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OQUSED
+
+# Use unregistered tri-state control; no output-enable clock is needed.
+LIOI3_SING_X0Y99.OLOGIC_Y1.OSERDES.DATA_RATE_TQ.BUF
