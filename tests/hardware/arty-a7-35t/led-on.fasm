@@ -1,0 +1,17 @@
+# Hold LD4 (H5) high on the Arty A7-35T.
+# Pin mappings and sources: README.md#wiring-and-channel-names.
+# The unselected data mux defaults to VCC; no LUT, clock, or routed data is
+# needed.
+# Four active features; this fixture has been checked on the local board.
+
+# Enable the 3.3 V output driver (the DB groups the 8/12 mA encodings).
+RIOB33_X43Y51.IOB_Y1.LVCMOS33_LVTTL.DRIVE.I12_I8
+
+# Pass D1 directly to the output, bypassing registers and serialization.
+RIOI3_X43Y51.OLOGIC_Y1.OMUX.D1
+
+# Enable the OQ output-data path so the pad receives D1.
+RIOI3_X43Y51.OLOGIC_Y1.OQUSED
+
+# Use unregistered tri-state control; no output-enable clock is needed.
+RIOI3_X43Y51.OLOGIC_Y1.OSERDES.DATA_RATE_TQ.BUF
