@@ -18,6 +18,13 @@
 #include "fpga/database-parsers.h"
 
 namespace fpga {
+// Loads an owned tile grid for a part from a family directory (e.g. artix7).
+// Resolves part -> device -> fabric through mapping/{parts,devices}.yaml.
+// Reads only those mappings and <fabric>/tilegrid.json; no part.json,
+// package pins, or segbits are needed. Read and parse errors are returned.
+absl::StatusOr<TileGrid> LoadTileGrid(std::string_view database_path,
+                                      std::string_view part_name);
+
 // Many to many map between banks and tiles.
 class BanksTilesRegistry {
   using tile_to_bank_type =

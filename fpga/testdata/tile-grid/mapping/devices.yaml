@@ -1,0 +1,8 @@
+device-a:
+  fabric: shared-fabric
+device-b:
+  fabric: shared-fabric
+missing:
+  fabric: missing
+invalid:
+  fabric: invalid

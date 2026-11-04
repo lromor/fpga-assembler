@@ -109,6 +109,7 @@ cc_test(
     srcs = [
         "database_test.cc",
     ],
+    data = glob(["testdata/tile-grid/**"]),
     deps = [
         ":database",
         ":database-parsers",

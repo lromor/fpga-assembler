@@ -1,0 +1,16 @@
+part-a:
+  device: device-a
+  package: test
+  speedgrade: '1'
+part-b:
+  device: device-b
+  package: test
+  speedgrade: '2'
+missing-grid:
+  device: missing
+  package: test
+  speedgrade: '1'
+invalid-grid:
+  device: invalid
+  package: test
+  speedgrade: '1'

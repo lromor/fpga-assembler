@@ -1,0 +1,30 @@
+{
+  "CLBLM_R_X1Y0": {
+    "type": "CLBLM_R",
+    "grid_x": 7,
+    "grid_y": 3,
+    "clock_region": "X0Y0",
+    "bits": {
+      "CLB_IO_CLK": {
+        "baseaddr": "0x00000400",
+        "frames": 36,
+        "offset": 2,
+        "words": 2
+      }
+    },
+    "sites": {
+      "SLICE_X2Y0": "SLICEM"
+    },
+    "pin_functions": {},
+    "prohibited_sites": []
+  },
+  "NULL_X0Y0": {
+    "type": "NULL",
+    "grid_x": 8,
+    "grid_y": 3,
+    "bits": {},
+    "sites": {},
+    "pin_functions": {},
+    "prohibited_sites": []
+  }
+}
