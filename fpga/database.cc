@@ -128,11 +128,14 @@ static absl::StatusOr<PartInfo> ParsePartInfo(
   return parts_infos.at(part);
 }
 
-static absl::StatusOr<TileGrid> ParseTileGrid(
-  const std::filesystem::path &prjxray_db_path,
-  const fpga::PartInfo &part_info) {
+absl::StatusOr<TileGrid> LoadTileGrid(std::string_view database_path,
+                                      std::string_view part_name) {
+  const std::filesystem::path root(database_path);
+  const absl::StatusOr<PartInfo> part_info =
+    ParsePartInfo(root, std::string(part_name));
+  if (!part_info.ok()) return part_info.status();
   const auto tilegrid_json_content_result =
-    MemoryMapFile(prjxray_db_path / part_info.fabric / "tilegrid.json");
+    MemoryMapFile(root / part_info->fabric / "tilegrid.json");
   if (!tilegrid_json_content_result.ok()) {
     return tilegrid_json_content_result.status();
   }
@@ -307,16 +310,9 @@ static absl::StatusOr<fpga::BanksTilesRegistry> CreateBanksRegistry(
 
 absl::StatusOr<PartDatabase> PartDatabase::Parse(std::string_view database_path,
                                                  std::string_view part_name) {
-  const absl::StatusOr<PartInfo> part_info_result =
-    ParsePartInfo(std::filesystem::path(database_path), std::string(part_name));
-  if (!part_info_result.ok()) {
-    return part_info_result.status();
-  }
-  const PartInfo &part_info = part_info_result.value();
-
   // Parse tilegrid.
   absl::StatusOr<fpga::TileGrid> tilegrid_result =
-    ParseTileGrid(database_path, part_info);
+    LoadTileGrid(database_path, part_name);
   if (!tilegrid_result.ok()) {
     return tilegrid_result.status();
   }

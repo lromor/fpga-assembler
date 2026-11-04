@@ -17,6 +17,60 @@
 
 namespace fpga {
 namespace {
+constexpr const char kGridDatabase[] = "fpga/testdata/tile-grid";
+
+TEST(LoadTileGrid, LoadsSharedFabricWithoutAssemblyFiles) {
+  // Different devices share one fabric. The fixture deliberately has no
+  // part.json, package_pins.csv, tile-type files, or segbits databases.
+  for (const char *part : {"part-a", "part-b"}) {
+    SCOPED_TRACE(part);
+    const auto grid = LoadTileGrid(kGridDatabase, part);
+    ASSERT_TRUE(grid.ok()) << grid.status();
+    ASSERT_EQ(grid->size(), 2U);
+    const auto clb = grid->find("CLBLM_R_X1Y0");
+    ASSERT_NE(clb, grid->end());
+    EXPECT_EQ(clb->second.type, "CLBLM_R");
+    EXPECT_EQ(clb->second.coord.x, 7U);
+    EXPECT_EQ(clb->second.coord.y, 3U);
+    EXPECT_EQ(clb->second.clock_region, "X0Y0");
+    EXPECT_THAT(clb->second.sites, ::testing::ElementsAre(
+                                     ::testing::Pair("SLICE_X2Y0", "SLICEM")));
+    const auto block = clb->second.bits.find(ConfigBusType::kCLBIOCLK);
+    ASSERT_NE(block, clb->second.bits.end());
+    EXPECT_EQ(block->second.base_address, 0x400U);
+    EXPECT_EQ(block->second.offset, 2);
+    EXPECT_EQ(block->second.frames, 36U);
+    EXPECT_EQ(block->second.words, 2U);
+    const auto empty = grid->find("NULL_X0Y0");
+    ASSERT_NE(empty, grid->end());
+    EXPECT_TRUE(empty->second.bits.empty());
+  }
+}
+
+TEST(LoadTileGrid, ReturnsLookupReadAndParseErrors) {
+  struct Case {
+    const char *root;
+    const char *part;
+    absl::StatusCode code;
+    const char *message;
+  };
+  const Case cases[] = {
+    {kGridDatabase, "unknown", absl::StatusCode::kInvalidArgument, "unknown"},
+    {"fpga/testdata/missing", "part-a", absl::StatusCode::kNotFound,
+     "mapping/parts.yaml"},
+    {kGridDatabase, "missing-grid", absl::StatusCode::kNotFound,
+     "missing/tilegrid.json"},
+    {kGridDatabase, "invalid-grid", absl::StatusCode::kInvalidArgument,
+     "json parsing error"},
+  };
+  for (const auto &test : cases) {
+    SCOPED_TRACE(test.part);
+    const auto grid = LoadTileGrid(test.root, test.part);
+    EXPECT_EQ(grid.status().code(), test.code);
+    EXPECT_THAT(grid.status().message(), ::testing::HasSubstr(test.message));
+  }
+}
+
 struct CorrectMappingAndTileNamesTestCase {
   Part part;
   PackagePins package_pins;
